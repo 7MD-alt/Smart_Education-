@@ -1,0 +1,11 @@
+# Ignore Python Virtual Environment
+att/
+
+# Ignore ALL Node Modules (the asterisk ensures it catches them in any subfolder)
+node_modules/
+frontend/node_modules/
+*/node_modules/
+
+# Keep standard Python cache out
+__pycache__/
+*.pyc
