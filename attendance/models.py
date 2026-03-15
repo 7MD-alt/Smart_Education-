@@ -1,90 +1,293 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
-from django.utils import timezone
 
-# ==========================================
-# BUCKET 1: IDENTITY & ROLES
-# ==========================================
+
+# =========================================================
+# ENUMS
+# =========================================================
+
+class RoleEnum(models.TextChoices):
+    ADMIN = "ADMIN", "Administrator"
+    TEACHER = "TEACHER", "Teacher"
+    STUDENT = "STUDENT", "Student"
+
+
+class AttendanceStatus(models.TextChoices):
+    PRESENT = "PRESENT", "Present"
+    ABSENT = "ABSENT", "Absent"
+    LATE = "LATE", "Late"
+
+
+class LoginMethod(models.TextChoices):
+    PASSWORD = "PASSWORD", "Password"
+    FACE_ID = "FACE_ID", "Face ID"
+
+
+class SenderRole(models.TextChoices):
+    STUDENT = "STUDENT", "Student"
+    SUPERVISOR = "SUPERVISOR", "Supervisor"
+    TUTOR = "TUTOR", "Tutor"
+
+
+# =========================================================
+# USER
+# =========================================================
+
 class User(AbstractUser):
-    # The 3 core roles for the RBAC system
-    class Role(models.TextChoices):
-        ADMIN = 'ADMIN', 'Administrator'
-        TEACHER = 'TEACHER', 'Professor'
-        STUDENT = 'STUDENT', 'Student'
+    role = models.CharField(
+        max_length=10,
+        choices=RoleEnum.choices,
+        default=RoleEnum.STUDENT,
+    )
+    is_active = models.BooleanField(default=True)
 
-    role = models.CharField(max_length=10, choices=Role.choices, default=Role.STUDENT)
+    def login(self):
+        pass
+
+    def logout(self):
+        pass
+
+    def triggerProfileCreationSignal(self):
+        pass
 
     def __str__(self):
-        return f"{self.first_name} {self.last_name} ({self.get_role_display()})"
+        full_name = f"{self.first_name} {self.last_name}".strip()
+        return full_name or self.username
+
+
+# =========================================================
+# ACADEMIC STRUCTURE
+# =========================================================
+
+class Department(models.Model):
+    code = models.CharField(max_length=20, unique=True)
+    name = models.CharField(max_length=150, unique=True)
+
+    def __str__(self):
+        return f"{self.code} - {self.name}"
+
+
+class Filiere(models.Model):
+    department = models.ForeignKey(
+        Department,
+        on_delete=models.CASCADE,
+        related_name="filieres",
+    )
+    code = models.CharField(max_length=20, unique=True)
+    name = models.CharField(max_length=150, unique=True)
+
+    def __str__(self):
+        return f"{self.code} - {self.name}"
+
+
+# =========================================================
+# PROFILES
+# =========================================================
+
+class AdminProfile(models.Model):
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        primary_key=True,
+        related_name="admin_profile",
+    )
+
+    def manageUsers(self):
+        pass
+
+    def manageStructure(self):
+        pass
+
+    def __str__(self):
+        return f"AdminProfile({self.user.username})"
+
+
+class TeacherProfile(models.Model):
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        primary_key=True,
+        related_name="teacher_profile",
+    )
+    department = models.ForeignKey(
+        Department,
+        on_delete=models.CASCADE,
+        related_name="teachers",
+    )
+
+    def createCourse(self):
+        pass
+
+    def uploadMaterial(self):
+        pass
+
+    def startLiveScanner(self):
+        pass
+
+    def __str__(self):
+        return f"TeacherProfile({self.user.username})"
+
 
 class StudentProfile(models.Model):
-    # Links directly to the User account, but holds the heavy AI data
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='student_profile')
-    student_id = models.CharField(max_length=50, unique=True)  # Massar or Apogee ID
-    filiere = models.CharField(max_length=150)  # e.g., 'Intelligence Artificielle'
-    
-    # The 128-point mathematical array from your dlib/OpenCV script
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        primary_key=True,
+        related_name="student_profile",
+    )
+    student_id = models.CharField(max_length=50, unique=True)
+    filiere = models.ForeignKey(
+        Filiere,
+        on_delete=models.CASCADE,
+        related_name="students",
+    )
+    semester = models.PositiveSmallIntegerField()
     face_encoding = models.JSONField(null=True, blank=True)
-    
-    # Fallback QR code hash
     qr_hash = models.CharField(max_length=255, null=True, blank=True, unique=True)
 
-    def __str__(self):
-        return f"{self.student_id} - {self.user.first_name} {self.user.last_name}"
+    def viewDashboard(self):
+        pass
 
-# ==========================================
-# BUCKET 2: ACADEMICS & TIME
-# ==========================================
-class Module(models.Model):
-    code = models.CharField(max_length=20, unique=True)
-    name = models.CharField(max_length=200)
-    
-    # A module belongs to one professor
-    professor = models.ForeignKey(User, on_delete=models.CASCADE, limit_choices_to={'role': 'TEACHER'})
-    
-    # Many students can be enrolled in one module
-    enrolled_students = models.ManyToManyField(StudentProfile, related_name='modules')
+    def initiateAIChat(self):
+        pass
 
     def __str__(self):
-        return f"{self.code}: {self.name}"
+        return f"{self.student_id} - {self.user}"
 
-class Session(models.Model):
-    module = models.ForeignKey(Module, on_delete=models.CASCADE, related_name='sessions')
-    date = models.DateField(default=timezone.now)
-    start_time = models.TimeField()
-    end_time = models.TimeField()
-    
-    class Status(models.TextChoices):
-        SCHEDULED = 'SCHEDULED', 'Scheduled'
-        LIVE = 'LIVE', 'Live'
-        COMPLETED = 'COMPLETED', 'Completed'
-        
-    status = models.CharField(max_length=15, choices=Status.choices, default=Status.SCHEDULED)
+
+# =========================================================
+# COURSES
+# =========================================================
+
+class Course(models.Model):
+    teacher = models.ForeignKey(
+        TeacherProfile,
+        on_delete=models.CASCADE,
+        related_name="courses",
+    )
+    title = models.CharField(max_length=200)
+    max_absences = models.PositiveIntegerField(default=3)
+
+    def isStudentInDangerZone(self):
+        pass
 
     def __str__(self):
-        return f"{self.module.code} - {self.date} ({self.status})"
+        return self.title
 
-# ==========================================
-# BUCKET 3: AI TELEMETRY
-# ==========================================
-class AttendanceRecord(models.Model):
-    session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='attendance_records')
-    student = models.ForeignKey(StudentProfile, on_delete=models.CASCADE, related_name='attendance_records')
-    
-    # The exact millisecond the AI recognized them
-    timestamp = models.DateTimeField(auto_now_add=True)
-    
-    # Status flags
-    is_present = models.BooleanField(default=False)
-    is_justified = models.BooleanField(default=False) # For medical notes, etc.
-    
-    # Telemetry data from the Python script
-    confidence_score = models.FloatField(null=True, blank=True) # e.g., 0.98 for 98% match
+
+class FiliereCourse(models.Model):
+    filiere = models.ForeignKey(
+        Filiere,
+        on_delete=models.CASCADE,
+        related_name="filiere_courses",
+    )
+    course = models.ForeignKey(
+        Course,
+        on_delete=models.CASCADE,
+        related_name="filiere_courses",
+    )
+    semester = models.PositiveSmallIntegerField()
 
     class Meta:
-        # Crucial: A student can only have ONE attendance record per class session to prevent duplicate AI scans
-        unique_together = ('session', 'student')
+        unique_together = ("filiere", "course")
 
     def __str__(self):
-        status = "Present" if self.is_present else "Absent"
-        return f"{self.student.user.last_name} | {self.session.module.code} | {status}"
+        return f"{self.filiere.code} <-> {self.course.title} (S{self.semester})"
+
+
+class CourseMaterial(models.Model):
+    course = models.ForeignKey(
+        Course,
+        on_delete=models.CASCADE,
+        related_name="materials",
+    )
+    file_path = models.CharField(max_length=500)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def generateEmbeddings(self):
+        pass
+
+    def __str__(self):
+        return f"Material #{self.id} - {self.course.title}"
+
+
+class DocumentEmbedding(models.Model):
+    material = models.ForeignKey(
+        CourseMaterial,
+        on_delete=models.CASCADE,
+        related_name="embeddings",
+    )
+    text_chunk = models.TextField()
+    embedding = models.JSONField()
+
+    def __str__(self):
+        return f"Embedding #{self.id} for material {self.material_id}"
+
+
+# =========================================================
+# ATTENDANCE
+# =========================================================
+
+class AttendanceRecord(models.Model):
+    course = models.ForeignKey(
+        Course,
+        on_delete=models.CASCADE,
+        related_name="attendance_records",
+    )
+    student = models.ForeignKey(
+        StudentProfile,
+        on_delete=models.CASCADE,
+        related_name="attendance_records",
+    )
+    date = models.DateField()
+    status = models.CharField(
+        max_length=10,
+        choices=AttendanceStatus.choices,
+        default=AttendanceStatus.ABSENT,
+    )
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("course", "student", "date")
+
+    def __str__(self):
+        return f"{self.student} - {self.course} - {self.status} - {self.date}"
+
+
+# =========================================================
+# AI CHAT
+# =========================================================
+
+class ChatSession(models.Model):
+    student = models.ForeignKey(
+        StudentProfile,
+        on_delete=models.CASCADE,
+        related_name="chat_sessions",
+    )
+    title = models.CharField(max_length=200)
+    login_method = models.CharField(
+        max_length=20,
+        choices=LoginMethod.choices,
+        default=LoginMethod.PASSWORD,
+    )
+    started_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.student.user.username} - {self.title}"
+
+
+class ChatMessage(models.Model):
+    session = models.ForeignKey(
+        ChatSession,
+        on_delete=models.CASCADE,
+        related_name="messages",
+    )
+    sender_role = models.CharField(
+        max_length=20,
+        choices=SenderRole.choices,
+    )
+    content = models.TextField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.sender_role} - session {self.session_id}"
