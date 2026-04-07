@@ -201,7 +201,7 @@ class CourseMaterial(models.Model):
         on_delete=models.CASCADE,
         related_name="materials",
     )
-    file_path = models.CharField(max_length=500)
+    file = models.FileField(upload_to="course_materials/")
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def generateEmbeddings(self):
@@ -210,8 +210,15 @@ class CourseMaterial(models.Model):
     def __str__(self):
         return f"Material #{self.id} - {self.course.title}"
 
+    def delete(self, *args, **kwargs):
+        storage = self.file.storage
+        path = self.file.name
+        super().delete(*args, **kwargs)
+        if path:
+            storage.delete(path)
 
-class DocumentEmbedding(models.Model):
+
+class MaterialEmbedding(models.Model):
     material = models.ForeignKey(
         CourseMaterial,
         on_delete=models.CASCADE,

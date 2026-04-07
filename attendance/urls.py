@@ -16,7 +16,7 @@ from .views import (
     CourseViewSet,
     FiliereCourseViewSet,
     CourseMaterialViewSet,
-    DocumentEmbeddingViewSet,
+    MaterialEmbeddingViewSet,
     AttendanceRecordViewSet,
     ChatSessionViewSet,
     ChatMessageViewSet,
@@ -38,7 +38,7 @@ router.register(r"filieres", FiliereViewSet)
 router.register(r"courses", CourseViewSet)
 router.register(r"filiere-courses", FiliereCourseViewSet)
 router.register(r"course-materials", CourseMaterialViewSet)
-router.register(r"document-embeddings", DocumentEmbeddingViewSet)
+router.register(r"material-embeddings", MaterialEmbeddingViewSet)
 router.register(r"attendance-records", AttendanceRecordViewSet)
 router.register(r"chat-sessions", ChatSessionViewSet)
 router.register(r"chat-messages", ChatMessageViewSet)

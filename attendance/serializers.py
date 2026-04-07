@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import (
+    MaterialEmbedding,
     User,
     AdminProfile,
     TeacherProfile,
@@ -9,7 +10,6 @@ from .models import (
     Course,
     FiliereCourse,
     CourseMaterial,
-    DocumentEmbedding,
     AttendanceRecord,
     ChatSession,
     ChatMessage,
@@ -151,7 +151,6 @@ class FiliereCourseSerializer(serializers.ModelSerializer):
 
 
 class CourseMaterialSerializer(serializers.ModelSerializer):
-    course = CourseSerializer(read_only=True)
     course_id = serializers.PrimaryKeyRelatedField(
         queryset=Course.objects.all(),
         source="course",
@@ -160,10 +159,10 @@ class CourseMaterialSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CourseMaterial
-        fields = ["id", "course", "course_id", "file_path", "uploaded_at"]
-
-
-class DocumentEmbeddingSerializer(serializers.ModelSerializer):
+        fields = ["id", "course", "course_id", "file", "uploaded_at"]
+        read_only_fields = ["id", "uploaded_at", "course"]
+        
+class MaterialEmbeddingSerializer(serializers.ModelSerializer):
     material = CourseMaterialSerializer(read_only=True)
     material_id = serializers.PrimaryKeyRelatedField(
         queryset=CourseMaterial.objects.all(),
@@ -172,7 +171,7 @@ class DocumentEmbeddingSerializer(serializers.ModelSerializer):
     )
 
     class Meta:
-        model = DocumentEmbedding
+        model = MaterialEmbedding
         fields = ["id", "material", "material_id", "text_chunk", "embedding"]
 
 

@@ -1,26 +1,74 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import LandingPage from './pages/LandingPage';
-import LoginPage from './pages/LoginPage';
-import StudentDashboard from './pages/StudentDashboard';
-import TeacherDashboard from './pages/TeacherDashboard'; // Added for the Professor portal
-import './App.css';
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+
+import LoginPage from "./pages/auth/LoginPage";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import TeacherDashboard from "./pages/teacher/TeacherDashboard";
+import StudentDashboard from "./pages/student/StudentDashboard";
+import DangerZonePage from "./pages/teacher/DangerZonePage";
+import ScanAttendance from "./pages/teacher/ScanAttendance";
+import TeacherMaterialsPage from "./pages/teacher/TeacherMaterialsPage";
+
+
+import ProtectedRoute from "./router/ProtectedRoute";
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* 1. The Startup Landing Page */}
-        <Route path="/" element={<LandingPage />} />
-        
-        {/* 2. The Shared Login Page */}
+        <Route path="/" element={<Navigate to="/login" />} />
         <Route path="/login" element={<LoginPage />} />
-        
-        {/* 3. The Student Portal (Attendance & Profile) */}
-        <Route path="/student-dashboard" element={<StudentDashboard />} /> 
-        
-        {/* 4. The Teacher Portal (AI Session Control) */}
-        <Route path="/teacher-dashboard" element={<TeacherDashboard />} />
+
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute role="ADMIN">
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/teacher"
+          element={
+            <ProtectedRoute role="TEACHER">
+              <TeacherDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/student"
+          element={
+            <ProtectedRoute role="STUDENT">
+              <StudentDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+  path="/teacher/scan"
+  element={
+    <ProtectedRoute role="TEACHER">
+      <ScanAttendance />
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/teacher/courses/:courseId/danger-zone"
+  element={
+    <ProtectedRoute role="TEACHER">
+      <DangerZonePage />
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/teacher/courses/:courseId/materials"
+  element={
+    <ProtectedRoute role="TEACHER">
+      <TeacherMaterialsPage />
+    </ProtectedRoute>
+  }
+/>
+
       </Routes>
     </BrowserRouter>
   );

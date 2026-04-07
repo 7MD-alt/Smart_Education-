@@ -9,7 +9,7 @@ from .models import (
     Course,
     FiliereCourse,
     CourseMaterial,
-    DocumentEmbedding,
+    MaterialEmbedding,
     AttendanceRecord,
     ChatSession,
     ChatMessage,
@@ -72,13 +72,17 @@ class FiliereCourseAdmin(admin.ModelAdmin):
 
 @admin.register(CourseMaterial)
 class CourseMaterialAdmin(admin.ModelAdmin):
-    list_display = ("id", "course", "file_path", "uploaded_at")
+    list_display = ("id", "course", "filename", "uploaded_at")
+    search_fields = ("course__title",)
     list_filter = ("uploaded_at",)
-    search_fields = ("course__title", "file_path")
+
+    def filename(self, obj):
+        return obj.file.name.split("/")[-1] if obj.file else ""
+    filename.short_description = "File"
 
 
-@admin.register(DocumentEmbedding)
-class DocumentEmbeddingAdmin(admin.ModelAdmin):
+@admin.register(MaterialEmbedding)
+class MaterialEmbeddingAdmin(admin.ModelAdmin):
     list_display = ("id", "material", "material_id")
     search_fields = ("material__course__title",)
 

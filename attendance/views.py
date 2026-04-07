@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import PermissionDenied
 
 from .models import (
     User,
@@ -14,7 +15,7 @@ from .models import (
     Course,
     FiliereCourse,
     CourseMaterial,
-    DocumentEmbedding,
+    MaterialEmbedding,
     AttendanceRecord,
     ChatSession,
     ChatMessage,
@@ -30,7 +31,7 @@ from .serializers import (
     CourseSerializer,
     FiliereCourseSerializer,
     CourseMaterialSerializer,
-    DocumentEmbeddingSerializer,
+    MaterialEmbeddingSerializer,
     AttendanceRecordSerializer,
     ChatSessionSerializer,
     ChatMessageSerializer,
@@ -189,10 +190,34 @@ class CourseMaterialViewSet(viewsets.ModelViewSet):
     serializer_class = CourseMaterialSerializer
     permission_classes = [IsAuthenticated, IsAdminOrTeacher]
 
+    def perform_create(self, serializer):
+        course = serializer.validated_data["course"]
 
-class DocumentEmbeddingViewSet(viewsets.ModelViewSet):
-    queryset = DocumentEmbedding.objects.all()
-    serializer_class = DocumentEmbeddingSerializer
+        if (
+            self.request.user.role == "TEACHER"
+            and course.teacher.user != self.request.user
+        ):
+            raise PermissionDenied("You can only upload materials to your own courses.")
+
+        serializer.save()
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+
+        if (
+            request.user.role == "TEACHER"
+            and instance.course.teacher.user != request.user
+        ):
+            return Response(
+                {"error": "You can only delete materials from your own courses."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        return super().destroy(request, *args, **kwargs)
+
+class MaterialEmbeddingViewSet(viewsets.ModelViewSet):
+    queryset = MaterialEmbedding.objects.all()
+    serializer_class = MaterialEmbeddingSerializer
     permission_classes = [IsAuthenticated, IsAdminOrTeacher]
 
 
@@ -227,9 +252,26 @@ class AttendanceScanAPIView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        result = recognize_and_mark_attendance(image, course_id)
-        return Response(result, status=status.HTTP_200_OK)
+        try:
+            course = Course.objects.select_related("teacher", "teacher__user").get(pk=course_id)
+        except Course.DoesNotExist:
+            return Response(
+                {"error": "Course not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
+        if course.teacher.user != request.user:
+            return Response(
+                {"error": "You can only scan attendance for your own courses."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        result = recognize_and_mark_attendance(image, course_id)
+
+        if result.get("success"):
+            return Response(result, status=status.HTTP_200_OK)
+
+        return Response(result, status=status.HTTP_400_BAD_REQUEST)
 
 class ChatAskAPIView(APIView):
     permission_classes = [IsAuthenticated, IsStudentUserRole]
