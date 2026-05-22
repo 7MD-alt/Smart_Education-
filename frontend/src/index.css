@@ -1,0 +1,301 @@
+@import "@fontsource-variable/geist";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── CSS Design Tokens ──────────────────────────────────────── */
+:root {
+  --bg:           #09090e;
+  --surface:      #0f0f17;
+  --surface-2:    #15151f;
+  --border:       rgba(255, 255, 255, 0.07);
+  --border-hover: rgba(255, 255, 255, 0.14);
+
+  --text-1:  #eeeef5;
+  --text-2:  #8b8b9e;
+  --text-3:  #4e4e62;
+
+  --violet:  #7c3aed;
+  --cyan:    #0891b2;
+  --pink:    #be185d;
+  --amber:   #b45309;
+  --green:   #15803d;
+  --red:     #b91c1c;
+
+  --violet-fg: #a78bfa;
+  --cyan-fg:   #22d3ee;
+  --pink-fg:   #f472b6;
+  --amber-fg:  #fbbf24;
+  --green-fg:  #4ade80;
+  --red-fg:    #f87171;
+
+  --radius-sm: 6px;
+  --radius:    10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+}
+
+/* ── Base ───────────────────────────────────────────────────── */
+html, body, #root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text-1);
+  font-family: "Geist Variable", -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* ── Scrollbar ──────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* ── Focus ──────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid rgba(124, 58, 237, 0.5);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ── Select options ─────────────────────────────────────────── */
+select option {
+  background: #13131c;
+  color: var(--text-1);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   COMPONENT CLASSES
+   ═══════════════════════════════════════════════════════════════ */
+
+@layer components {
+
+  /* ── Cards ──────────────────────────────────────────────── */
+  .card {
+    @apply rounded-[var(--radius-lg)] border bg-[var(--surface)] p-5;
+    border-color: var(--border);
+  }
+
+  .card-sm {
+    @apply rounded-[var(--radius)] border bg-[var(--surface)] p-4;
+    border-color: var(--border);
+  }
+
+  /* ── Inputs ─────────────────────────────────────────────── */
+  .input {
+    @apply w-full rounded-[var(--radius)] border bg-[var(--surface-2)] px-3 py-2 text-sm
+           text-[var(--text-1)] placeholder:text-[var(--text-3)]
+           transition-colors duration-150
+           focus:outline-none focus:ring-0;
+    border-color: var(--border);
+  }
+  .input:focus {
+    border-color: var(--border-hover);
+    background: #1a1a26;
+  }
+
+  /* ── Buttons ────────────────────────────────────────────── */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-[var(--radius)]
+           px-4 py-2 text-sm font-medium transition-all duration-150
+           disabled:pointer-events-none disabled:opacity-40 select-none;
+  }
+
+  .btn-primary {
+    @apply btn bg-[var(--text-1)] text-[var(--bg)] hover:bg-white;
+  }
+
+  .btn-ghost {
+    @apply btn border text-[var(--text-2)] hover:text-[var(--text-1)];
+    border-color: var(--border);
+    background: transparent;
+  }
+  .btn-ghost:hover {
+    background: rgba(255,255,255,0.05);
+    border-color: var(--border-hover);
+  }
+
+  .btn-danger {
+    @apply btn bg-red-600 text-white hover:bg-red-500;
+  }
+
+  .btn-violet {
+    @apply btn text-violet-300;
+    background: rgba(124, 58, 237, 0.15);
+    border: 1px solid rgba(124, 58, 237, 0.25);
+  }
+  .btn-violet:hover {
+    background: rgba(124, 58, 237, 0.22);
+  }
+
+  .btn-cyan {
+    @apply btn text-cyan-300;
+    background: rgba(8, 145, 178, 0.15);
+    border: 1px solid rgba(8, 145, 178, 0.25);
+  }
+  .btn-cyan:hover {
+    background: rgba(8, 145, 178, 0.22);
+  }
+
+  /* ── Badges / Status pills ──────────────────────────────── */
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5
+           text-[11px] font-medium;
+  }
+
+  .badge-green  { @apply badge bg-green-950  text-green-400  ring-1 ring-green-500/20;  }
+  .badge-red    { @apply badge bg-red-950    text-red-400    ring-1 ring-red-500/20;    }
+  .badge-amber  { @apply badge bg-amber-950  text-amber-400  ring-1 ring-amber-500/20;  }
+  .badge-violet { @apply badge bg-violet-950 text-violet-400 ring-1 ring-violet-500/20; }
+  .badge-cyan   { @apply badge bg-cyan-950   text-cyan-400   ring-1 ring-cyan-500/20;   }
+  .badge-pink   { @apply badge bg-pink-950   text-pink-400   ring-1 ring-pink-500/20;   }
+  .badge-gray   { @apply badge bg-white/5    text-[var(--text-2)] ring-1; }
+
+  /* ── Section labels ─────────────────────────────────────── */
+  .label {
+    @apply text-xs font-semibold uppercase tracking-wider text-[var(--text-3)];
+  }
+
+  /* ── Page header ────────────────────────────────────────── */
+  .page-header {
+    @apply flex flex-wrap items-start justify-between gap-4 pb-6;
+  }
+  .page-title {
+    @apply text-xl font-semibold tracking-tight text-[var(--text-1)];
+  }
+  .page-sub {
+    @apply mt-0.5 text-sm text-[var(--text-2)];
+  }
+
+  /* ── Stat card ──────────────────────────────────────────── */
+  .stat-card {
+    @apply card flex flex-col gap-1 transition-colors duration-150;
+  }
+  .stat-card:hover {
+    border-color: var(--border-hover);
+  }
+  .stat-label { @apply label; }
+  .stat-value { @apply mt-2 text-3xl font-semibold tracking-tight text-[var(--text-1)]; }
+
+  /* ── Table ──────────────────────────────────────────────── */
+  .table-wrap {
+    @apply overflow-hidden rounded-[var(--radius-lg)] border;
+    border-color: var(--border);
+  }
+  .table-base {
+    @apply w-full border-collapse text-sm;
+  }
+  .table-base thead {
+    background: var(--surface);
+  }
+  .table-base th {
+    @apply px-4 py-3 text-left font-medium text-[var(--text-3)];
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .table-base td {
+    @apply px-4 py-3 text-[var(--text-2)];
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .table-base tr:last-child td {
+    border-bottom: none;
+  }
+  .table-base tbody tr {
+    background: #09090e;
+    transition: background 120ms;
+  }
+  .table-base tbody tr:hover {
+    background: var(--surface);
+  }
+
+  /* ── Divider ────────────────────────────────────────────── */
+  .divider {
+    @apply h-px w-full;
+    background: var(--border);
+  }
+
+  /* ── Modal ──────────────────────────────────────────────── */
+  .modal-overlay {
+    @apply fixed inset-0 z-50 flex items-center justify-center p-4;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(4px);
+  }
+  .modal-panel {
+    @apply w-full max-w-md rounded-[var(--radius-xl)] border shadow-2xl;
+    background: var(--surface);
+    border-color: var(--border-hover);
+  }
+  .modal-header {
+    @apply flex items-center justify-between border-b px-5 py-4;
+    border-color: var(--border);
+  }
+  .modal-body   { @apply px-5 py-5; }
+  .modal-footer {
+    @apply flex justify-end gap-2 border-t px-5 py-4;
+    border-color: var(--border);
+  }
+
+  /* ── Empty state ────────────────────────────────────────── */
+  .empty-state {
+    @apply flex flex-col items-center justify-center gap-3 rounded-[var(--radius-lg)]
+           border border-dashed py-16 text-center;
+    border-color: var(--border);
+  }
+
+  /* ── Skeleton ───────────────────────────────────────────── */
+  .skeleton {
+    @apply animate-pulse rounded-lg;
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  /* ── Nav item (sidebar) ─────────────────────────────────── */
+  .nav-item {
+    @apply flex items-center gap-3 rounded-[var(--radius)] px-3 py-2
+           text-sm font-medium transition-colors duration-100 select-none cursor-pointer;
+    color: var(--text-3);
+  }
+  .nav-item:hover {
+    background: rgba(255,255,255,0.05);
+    color: var(--text-2);
+  }
+  .nav-item.active {
+    background: rgba(255,255,255,0.07);
+    color: var(--text-1);
+  }
+}
+
+/* ── Page transition ────────────────────────────────────────── */
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.page-enter {
+  animation: page-in 0.22s ease-out both;
+}
+
+/* ── Number counter animation ───────────────────────────────── */
+@keyframes count-up {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.count-enter {
+  animation: count-up 0.35s ease-out both;
+}

@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: smart-education-backend
+    runtime: python
+    buildCommand: "pip install -r requirements.txt && python manage.py migrate && python manage.py collectstatic --noinput"
+    startCommand: "gunicorn backend_core.wsgi:application"
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: DJANGO_SECRET_KEY
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+databases:
+  - name: smart-education-db
+    plan: free
