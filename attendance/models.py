@@ -18,6 +18,24 @@ class AttendanceStatus(models.TextChoices):
     LATE = "LATE", "Late"
 
 
+class TPGroup(models.TextChoices):
+    NONE    = "NONE",    "No group (Cours)"
+    GROUP_A = "GROUP_A", "Groupe A"
+    GROUP_B = "GROUP_B", "Groupe B"
+
+
+class SessionType(models.TextChoices):
+    COURS = "COURS", "Cours"
+    TP    = "TP",    "Travaux Pratiques"
+
+
+class SeanceStatus(models.TextChoices):
+    SCHEDULED = "SCHEDULED", "Scheduled"
+    ACTIVE    = "ACTIVE",    "Active"
+    COMPLETED = "COMPLETED", "Completed"
+    CANCELLED = "CANCELLED", "Cancelled"
+
+
 class LoginMethod(models.TextChoices):
     PASSWORD = "PASSWORD", "Password"
     FACE_ID = "FACE_ID", "Face ID"
@@ -135,7 +153,8 @@ class StudentProfile(models.Model):
         primary_key=True,
         related_name="student_profile",
     )
-    student_id = models.CharField(max_length=50, unique=True)
+    student_id  = models.CharField(max_length=50, unique=True)
+    massar_code = models.CharField(max_length=30, unique=True, null=True, blank=True)
     filiere = models.ForeignKey(
         Filiere,
         on_delete=models.CASCADE,
@@ -144,6 +163,11 @@ class StudentProfile(models.Model):
     semester = models.PositiveSmallIntegerField()
     face_encoding = models.JSONField(null=True, blank=True)
     qr_hash = models.CharField(max_length=255, null=True, blank=True, unique=True)
+    tp_group = models.CharField(
+        max_length=10,
+        choices=TPGroup.choices,
+        default=TPGroup.NONE,
+    )
 
     def viewDashboard(self):
         pass
@@ -232,6 +256,52 @@ class MaterialEmbedding(models.Model):
 
 
 # =========================================================
+# SEANCES
+# =========================================================
+
+class Seance(models.Model):
+    course = models.ForeignKey(
+        Course,
+        on_delete=models.CASCADE,
+        related_name="seances",
+    )
+    date = models.DateField()
+    start_time = models.TimeField()
+    duration_minutes = models.PositiveIntegerField(default=60)
+    session_type = models.CharField(
+        max_length=10,
+        choices=SessionType.choices,
+        default=SessionType.COURS,
+    )
+    # For TP: GROUP_A or GROUP_B. For Cours: NONE.
+    tp_group = models.CharField(
+        max_length=10,
+        choices=TPGroup.choices,
+        default=TPGroup.NONE,
+    )
+    status = models.CharField(
+        max_length=10,
+        choices=SeanceStatus.choices,
+        default=SeanceStatus.SCHEDULED,
+    )
+    notes = models.TextField(blank=True, default="")
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="created_seances",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["date", "start_time"]
+
+    def __str__(self):
+        group_label = f" [{self.tp_group}]" if self.tp_group != TPGroup.NONE else ""
+        return f"{self.course.title} — {self.session_type}{group_label} — {self.date} {self.start_time}"
+
+
+# =========================================================
 # ATTENDANCE
 # =========================================================
 
@@ -246,6 +316,14 @@ class AttendanceRecord(models.Model):
         on_delete=models.CASCADE,
         related_name="attendance_records",
     )
+    # Nullable for backward compat; all new records will have a seance
+    seance = models.ForeignKey(
+        Seance,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="attendance_records",
+    )
     date = models.DateField()
     status = models.CharField(
         max_length=10,
@@ -255,7 +333,19 @@ class AttendanceRecord(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ("course", "student", "date")
+        # One record per student per seance; fall back to (course, student, date) for legacy
+        constraints = [
+            models.UniqueConstraint(
+                fields=["seance", "student"],
+                condition=models.Q(seance__isnull=False),
+                name="unique_attendance_per_seance_student",
+            ),
+            models.UniqueConstraint(
+                fields=["course", "student", "date"],
+                condition=models.Q(seance__isnull=True),
+                name="unique_attendance_legacy",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.student} - {self.course} - {self.status} - {self.date}"
@@ -298,3 +388,70 @@ class ChatMessage(models.Model):
 
     def __str__(self):
         return f"{self.sender_role} - session {self.session_id}"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Notifications
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Face Registration Requests
+# ─────────────────────────────────────────────────────────────────────────────
+
+class FaceRequestStatus(models.TextChoices):
+    PENDING  = "PENDING",  "Pending review"
+    APPROVED = "APPROVED", "Approved"
+    REJECTED = "REJECTED", "Rejected"
+
+
+class FaceRegistrationRequest(models.Model):
+    student     = models.ForeignKey(
+        "StudentProfile", on_delete=models.CASCADE, related_name="face_requests"
+    )
+    image       = models.ImageField(upload_to="face_requests/")
+    status      = models.CharField(
+        max_length=10, choices=FaceRequestStatus.choices, default=FaceRequestStatus.PENDING
+    )
+    created_at  = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="reviewed_face_requests"
+    )
+    reject_reason = models.CharField(max_length=300, blank=True, default="")
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"FaceRequest[{self.status}] {self.student.student_id}"
+
+
+class NotificationType(models.TextChoices):
+    ABSENCE_INFO    = "ABSENCE_INFO",    "First absence recorded"
+    ABSENCE_WARNING = "ABSENCE_WARNING", "Approaching absence limit"
+    ABSENCE_DANGER  = "ABSENCE_DANGER",  "Absence limit reached"
+    MATERIAL_ADDED  = "MATERIAL_ADDED",  "New course material uploaded"
+    STUDENT_JOINED  = "STUDENT_JOINED",  "Student enrolled in your course"
+    COURSE_ASSIGNED = "COURSE_ASSIGNED", "You were assigned to a new course"
+    FACE_REQUEST    = "FACE_REQUEST",    "Face registration request update"
+    SEANCE_CREATED  = "SEANCE_CREATED",  "New séance scheduled"
+    SEANCE_STARTED  = "SEANCE_STARTED",  "Séance has started — mark your attendance"
+
+
+class Notification(models.Model):
+    user       = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="notifications"
+    )
+    type       = models.CharField(max_length=30, choices=NotificationType.choices)
+    title      = models.CharField(max_length=200)
+    message    = models.TextField()
+    is_read    = models.BooleanField(default=False)
+    link       = models.CharField(max_length=300, blank=True, default="")
+    metadata   = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"[{self.type}] {self.user.username}: {self.title}"

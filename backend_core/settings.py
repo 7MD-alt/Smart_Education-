@@ -266,3 +266,4 @@ CAMPUSEYE_FRONTEND_URL = os.environ.get("CAMPUSEYE_FRONTEND_URL", "http://localh
 # ==========================================
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+GROQ_API_KEY      = os.environ.get("GROQ_API_KEY", "")

@@ -108,9 +108,11 @@ class StudentProfileSerializer(serializers.ModelSerializer):
             "user",
             "user_id",
             "student_id",
+            "massar_code",
             "filiere",
             "filiere_id",
             "semester",
+            "tp_group",
             "face_encoding",
             "qr_hash",
         ]

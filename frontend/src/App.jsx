@@ -9,6 +9,7 @@ import UsersPage             from "./pages/admin/UsersPage";
 import DepartmentsPage       from "./pages/admin/DepartmentsPage";
 import FilieresPage          from "./pages/admin/FilieresPage";
 import CoursesPage           from "./pages/admin/CoursesPage";
+import FaceRequestsPage      from "./pages/admin/FaceRequestsPage";
 
 import TeacherDashboard      from "./pages/teacher/TeacherDashboard";
 import TeacherProfilePage    from "./pages/teacher/TeacherProfilePage";
@@ -21,6 +22,7 @@ import StudentDashboard      from "./pages/student/StudentDashboard";
 import StudentProfilePage    from "./pages/student/StudentProfilePage";
 import StudentAttendancePage from "./pages/student/StudentAttendancePage";
 import StudentChatPage       from "./pages/student/StudentChatPage";
+import StudentCourseMaterialsPage from "./pages/student/StudentCourseMaterialsPage";
 
 import ProtectedRoute        from "./router/ProtectedRoute";
 
@@ -38,6 +40,7 @@ function App() {
         <Route path="/admin/departments" element={<ProtectedRoute role="ADMIN"><DepartmentsPage /></ProtectedRoute>} />
         <Route path="/admin/filieres" element={<ProtectedRoute role="ADMIN"><FilieresPage /></ProtectedRoute>} />
         <Route path="/admin/courses" element={<ProtectedRoute role="ADMIN"><CoursesPage /></ProtectedRoute>} />
+        <Route path="/admin/face-requests" element={<ProtectedRoute role="ADMIN"><FaceRequestsPage /></ProtectedRoute>} />
 
         {/* ── Teacher ───────────────────────────────────────────────── */}
         <Route path="/teacher" element={<ProtectedRoute role="TEACHER"><TeacherDashboard /></ProtectedRoute>} />
@@ -52,6 +55,7 @@ function App() {
         <Route path="/student/profile" element={<ProtectedRoute role="STUDENT"><StudentProfilePage /></ProtectedRoute>} />
         <Route path="/student/attendance" element={<ProtectedRoute role="STUDENT"><StudentAttendancePage /></ProtectedRoute>} />
         <Route path="/student/chat" element={<ProtectedRoute role="STUDENT"><StudentChatPage /></ProtectedRoute>} />
+        <Route path="/student/courses/:courseId/materials" element={<ProtectedRoute role="STUDENT"><StudentCourseMaterialsPage /></ProtectedRoute>} />
 
         {/* ── Fallback ──────────────────────────────────────────────── */}
         <Route path="*" element={<Navigate to="/login" />} />

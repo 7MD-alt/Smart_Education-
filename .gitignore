@@ -1,20 +1,37 @@
-# Ignore Python Virtual Environment
+# ── Virtual environment ────────────────────────────────────────────────────────
 att/
 
-# Ignore ALL Node Modules
+# ── Node modules ───────────────────────────────────────────────────────────────
 node_modules/
 frontend/node_modules/
 */node_modules/
+frontend/dist/
 
-# Keep standard Python cache out
+# ── Python cache ───────────────────────────────────────────────────────────────
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 
-# Environment variables - NEVER commit these
+# ── Environment variables — NEVER commit ──────────────────────────────────────
 .env
 .env.*
 *.env
 
-.env
-*.env
-.env.*
+# ── Database ───────────────────────────────────────────────────────────────────
+db.sqlite3
+*.sqlite3
+
+# ── Django collected static files ─────────────────────────────────────────────
+staticfiles/
+
+# ── Media uploads (user files, face images, course materials) ─────────────────
+media/
+
+# ── OS junk ────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── IDE ────────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
