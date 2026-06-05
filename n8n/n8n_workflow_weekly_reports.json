@@ -1,0 +1,150 @@
+{
+  "name": "CampusEye — Weekly Attendance Reports",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 7 * * 1" }]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every Monday at 7am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://127.0.0.1:8000/api/n8n/weekly-report/",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "X-N8N-Token", "value": "campuseye-n8n-secret-2026" }]
+        },
+        "options": { "timeout": 30000 }
+      },
+      "id": "fetch-report-data",
+      "name": "Fetch weekly stats from Django",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [{
+            "id": "has-teachers",
+            "leftValue": "={{ $json.teachers.length }}",
+            "rightValue": 0,
+            "operator": { "type": "number", "operation": "gt" }
+          }],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-has-teachers",
+      "name": "Any teachers?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "teachers",
+        "options": {}
+      },
+      "id": "split-teachers",
+      "name": "Split by teacher",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [{
+            "id": "has-email",
+            "leftValue": "={{ $json.teacher_email }}",
+            "rightValue": "",
+            "operator": { "type": "string", "operation": "notEmpty" }
+          }],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-email",
+      "name": "Teacher has email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "url": "http://127.0.0.1:8000/api/n8n/send-alert/",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "X-N8N-Token", "value": "campuseye-n8n-secret-2026" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"student_email\": \"{{ $json.teacher_email }}\",\n  \"student_name\": \"{{ $json.teacher_name }}\",\n  \"course_title\": \"Weekly Report\",\n  \"teacher_name\": \"CampusEye\",\n  \"absences\": 0,\n  \"max_absences\": 0,\n  \"remaining\": 0,\n  \"status\": \"WEEKLY_REPORT\",\n  \"report_week\": \"{{ $('Fetch weekly stats from Django').item.json.week }}\",\n  \"courses\": {{ JSON.stringify($json.courses) }}\n}",
+        "options": {}
+      },
+      "id": "send-report-email",
+      "name": "Send report to Django mailer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1340, 160]
+    },
+    {
+      "parameters": { "options": {} },
+      "id": "no-email-skip",
+      "name": "No email — skip",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1340, 340]
+    },
+    {
+      "parameters": { "options": {} },
+      "id": "no-teachers",
+      "name": "No teachers found",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [900, 420]
+    }
+  ],
+  "connections": {
+    "Every Monday at 7am": {
+      "main": [[{ "node": "Fetch weekly stats from Django", "type": "main", "index": 0 }]]
+    },
+    "Fetch weekly stats from Django": {
+      "main": [[{ "node": "Any teachers?", "type": "main", "index": 0 }]]
+    },
+    "Any teachers?": {
+      "main": [
+        [{ "node": "Split by teacher", "type": "main", "index": 0 }],
+        [{ "node": "No teachers found", "type": "main", "index": 0 }]
+      ]
+    },
+    "Split by teacher": {
+      "main": [[{ "node": "Teacher has email?", "type": "main", "index": 0 }]]
+    },
+    "Teacher has email?": {
+      "main": [
+        [{ "node": "Send report to Django mailer", "type": "main", "index": 0 }],
+        [{ "node": "No email — skip", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "tags": ["campuseye", "reports", "weekly"],
+  "triggerCount": 1,
+  "updatedAt": "2026-05-30T00:00:00.000Z",
+  "versionId": "1"
+}

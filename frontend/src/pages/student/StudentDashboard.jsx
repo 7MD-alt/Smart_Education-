@@ -37,7 +37,7 @@ const AttendanceRing = ({ rate = 0 }) => {
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-2xl font-bold tabular-nums" style={{ color }}>{rate}%</span>
+          <span className="tabular-nums" style={{ fontSize: "1.75rem", fontWeight: 750, letterSpacing: "-0.04em", lineHeight: 1, color }}>{rate}%</span>
           <span className="text-[10px] uppercase tracking-wider mt-0.5" style={{ color: "var(--text-3)" }}>Rate</span>
         </div>
       </div>
@@ -47,34 +47,64 @@ const AttendanceRing = ({ rate = 0 }) => {
 };
 
 /* ── Stat card ───────────────────────────────────────────────── */
-const StatCard = ({ label, value, icon: Icon, danger, sub, accent, glow, delay = 0 }) => (
-  <div
-    className="relative overflow-hidden rounded-[var(--radius-lg)] p-5 transition-all duration-200 fade-up group"
-    style={{
-      border: danger ? "1px solid rgba(185,28,28,0.35)" : "1px solid var(--border)",
-      background: danger ? "rgba(185,28,28,0.06)" : "var(--surface)",
-      animationDelay: `${delay}ms`,
-    }}
-    onMouseEnter={e => { e.currentTarget.style.borderColor = danger ? "rgba(185,28,28,0.5)" : (accent ? `${accent}50` : "var(--border-hover)"); }}
-    onMouseLeave={e => { e.currentTarget.style.borderColor = danger ? "rgba(185,28,28,0.35)" : "var(--border)"; }}
-  >
-    <div className="pointer-events-none absolute right-0 top-0 h-20 w-20 rounded-full"
-         style={{ background: danger ? "rgba(185,28,28,0.2)" : (glow || "rgba(124,58,237,0.1)"), filter: "blur(24px)", opacity: 0.6 }} />
+const StatCard = ({ label, value, icon: Icon, danger, sub, accent, glow, delay = 0 }) => {
+  const a  = danger ? "#f87171" : (accent || "#a78bfa");
+  const g  = danger ? "rgba(185,28,28,0.18)" : (glow || "rgba(124,58,237,0.15)");
+  const bc = danger ? "rgba(185,28,28,0.3)" : `${a}22`;
+  return (
+    <div
+      className="spotlight relative overflow-hidden rounded-[var(--radius-lg)] p-6 fade-up group"
+      style={{
+        border: `1px solid ${bc}`,
+        background: "var(--surface)",
+        backdropFilter: "blur(20px)",
+        animationDelay: `${delay}ms`,
+        transition: "border-color 220ms, box-shadow 220ms, transform 220ms",
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.borderColor = `${a}45`;
+        e.currentTarget.style.boxShadow = `0 0 50px ${g}, 0 8px 32px rgba(0,0,0,0.4)`;
+        e.currentTarget.style.transform = "translateY(-3px)";
+        const bar = e.currentTarget.querySelector("[data-accent-bar]");
+        if (bar) bar.style.transform = "scaleX(1)";
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.borderColor = bc;
+        e.currentTarget.style.boxShadow = "none";
+        e.currentTarget.style.transform = "none";
+        const bar = e.currentTarget.querySelector("[data-accent-bar]");
+        if (bar) bar.style.transform = "scaleX(0)";
+      }}
+    >
+      {/* Glow blob */}
+      <div className="pointer-events-none absolute -right-4 -top-4 h-28 w-28 rounded-full"
+        style={{ background: `radial-gradient(circle, ${a}30 0%, transparent 70%)`, filter: "blur(18px)" }} />
+      {/* Bottom bar — slides in on hover */}
+      <div data-accent-bar className="pointer-events-none absolute bottom-0 left-0 right-0 h-[2px]"
+        style={{
+          background: `linear-gradient(90deg, transparent, ${a}60, transparent)`,
+          transform: "scaleX(0)", transformOrigin: "left",
+          transition: "transform 400ms cubic-bezier(0.16,1,0.3,1)",
+        }} />
 
-    <div className="relative flex items-start justify-between">
-      <p className="stat-label" style={{ color: danger ? "var(--red-fg)" : undefined }}>{label}</p>
-      <div className="flex h-8 w-8 items-center justify-center rounded-[var(--radius)] transition-transform duration-200 group-hover:scale-110"
-           style={{ background: danger ? "rgba(185,28,28,0.2)" : (glow || "var(--surface-2)"), border: `1px solid ${danger ? "rgba(185,28,28,0.3)" : "var(--border)"}` }}>
-        <Icon className="h-4 w-4" style={{ color: danger ? "#f87171" : (accent || "var(--text-3)"), filter: accent ? `drop-shadow(0 0 4px ${accent})` : undefined }} />
+      <div className="relative flex items-start justify-between mb-4">
+        <p className="label" style={{ color: danger ? "#f87171" : undefined }}>{label}</p>
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-300 group-hover:scale-110"
+          style={{ background: `linear-gradient(135deg, ${a}25, ${a}10)`, border: `1px solid ${a}35`, boxShadow: `0 0 14px ${a}20` }}>
+          <Icon className="h-5 w-5" style={{ color: a, filter: `drop-shadow(0 0 4px ${a})` }} />
+        </div>
       </div>
+      <p className="count-enter relative" style={{
+        fontSize: "2.4rem", fontWeight: 750, letterSpacing: "-0.05em",
+        color: a, lineHeight: 1, animationDelay: `${delay + 80}ms`,
+        textShadow: `0 0 32px ${a}65`,
+      }}>
+        {value ?? "—"}
+      </p>
+      {sub && <p className="mt-2 text-xs" style={{ color: "var(--text-3)" }}>{sub}</p>}
     </div>
-    <p className={`mt-3 text-3xl font-bold tracking-tight tabular-nums count-enter`}
-       style={{ color: danger ? "#f87171" : (accent || "var(--text-1)"), animationDelay: `${delay + 80}ms` }}>
-      {value ?? "—"}
-    </p>
-    {sub && <p className="mt-1 text-xs" style={{ color: "var(--text-3)" }}>{sub}</p>}
-  </div>
-);
+  );
+};
 
 /* ── Course card ─────────────────────────────────────────────── */
 const PALETTE = [
@@ -86,18 +116,33 @@ const PALETTE = [
 ];
 
 const CourseCard = ({ course, risk, index }) => {
-  const { accent, glow } = risk ? { accent: "#f87171", glow: "rgba(185,28,28,0.12)" } : PALETTE[index % PALETTE.length];
+  const { accent, glow } = risk ? { accent: "#f87171", glow: "rgba(185,28,28,0.14)" } : PALETTE[index % PALETTE.length];
   return (
     <div
-      className="group relative overflow-hidden rounded-[var(--radius-lg)] p-5 transition-all duration-200 fade-up"
-      style={{ border: `1px solid ${risk ? "rgba(185,28,28,0.3)" : "var(--border)"}`, background: "var(--surface)", animationDelay: `${index * 60}ms` }}
-      onMouseEnter={e => { e.currentTarget.style.borderColor = `${accent}45`; e.currentTarget.style.boxShadow = `0 4px 24px ${glow}`; }}
-      onMouseLeave={e => { e.currentTarget.style.borderColor = risk ? "rgba(185,28,28,0.3)" : "var(--border)"; e.currentTarget.style.boxShadow = "none"; }}
+      className="spotlight group relative overflow-hidden rounded-[var(--radius-lg)] p-5 fade-up"
+      style={{
+        border: `1px solid ${risk ? "rgba(185,28,28,0.25)" : `${accent}18`}`,
+        background: "var(--surface)", backdropFilter: "blur(20px)",
+        animationDelay: `${index * 60}ms`,
+        transition: "border-color 220ms, box-shadow 220ms, transform 220ms",
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.borderColor = `${accent}45`;
+        e.currentTarget.style.boxShadow = `0 0 40px ${glow.replace("0.14","0.18")}, 0 8px 32px rgba(0,0,0,0.4)`;
+        e.currentTarget.style.transform = "translateY(-2px)";
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.borderColor = risk ? "rgba(185,28,28,0.25)" : `${accent}18`;
+        e.currentTarget.style.boxShadow = "none";
+        e.currentTarget.style.transform = "none";
+      }}
     >
-      {/* Accent top */}
-      <div className="absolute inset-x-0 top-0 h-0.5" style={{ background: `linear-gradient(90deg, transparent, ${accent}, transparent)`, opacity: 0.8 }} />
+      {/* Accent top line */}
+      <div className="absolute inset-x-0 top-0 h-[2px]"
+        style={{ background: `linear-gradient(90deg, transparent, ${accent}, transparent)` }} />
       {/* Background glow */}
-      <div className="pointer-events-none absolute right-0 top-0 h-20 w-20 rounded-full" style={{ background: glow, filter: "blur(28px)", opacity: 0.5 }} />
+      <div className="pointer-events-none absolute -right-4 -top-4 h-24 w-24 rounded-full"
+        style={{ background: `radial-gradient(circle, ${accent}25 0%, transparent 70%)`, filter: "blur(20px)" }} />
 
       <div className="relative flex items-start justify-between gap-3">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius)]"
@@ -183,16 +228,20 @@ const StudentDashboard = () => {
         {/* Header */}
         <div className="page-header fade-up">
           <div>
-            <p className="label mb-1">Student Portal</p>
-            <h1 className="page-title">
-              Welcome back,{" "}
+            <div className="flex items-center gap-2 mb-3">
+              <div className="h-px flex-1 max-w-[40px]"
+                style={{ background: "linear-gradient(90deg, rgba(167,139,250,0.5), transparent)" }} />
+              <p className="label">Student Portal</p>
+            </div>
+            <h1 style={{ fontSize: "2.25rem", fontWeight: 750, letterSpacing: "-0.04em", color: "#f0f0ff", lineHeight: 1.1 }}>
+              Welcome,{" "}
               <span style={{
-                background: "linear-gradient(135deg, #a78bfa, #22d3ee)",
+                background: "linear-gradient(135deg, #a78bfa 0%, #67e8f9 60%, #22d3ee 100%)",
                 WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
               }}>{firstName}</span>
             </h1>
             {profile?.filiere && (
-              <p className="page-sub">{profile.filiere.name} · Semester {profile.semester}</p>
+              <p className="page-sub mt-2">{profile.filiere.name} · Semester {profile.semester}</p>
             )}
           </div>
           <Link to="/student/chat">
@@ -216,12 +265,12 @@ const StudentDashboard = () => {
         {summary && (
           <div className="grid gap-5 lg:grid-cols-3 fade-up" style={{ animationDelay: "200ms" }}>
             {/* Ring */}
-            <div className="card flex items-center justify-center py-8">
+            <div className="card spotlight flex items-center justify-center py-8">
               <AttendanceRing rate={summary.attendance_rate ?? 0} />
             </div>
 
             {/* Breakdown */}
-            <div className="card">
+            <div className="card spotlight">
               <p className="label mb-4">Session Breakdown</p>
               <div className="space-y-2.5">
                 {[
@@ -234,14 +283,14 @@ const StudentDashboard = () => {
                     <div className="flex items-center gap-2 text-sm font-medium" style={{ color: accent }}>
                       <Icon className="h-4 w-4" style={{ filter: `drop-shadow(0 0 4px ${accent})` }} /> {label}
                     </div>
-                    <span className="text-lg font-bold tabular-nums" style={{ color: "var(--text-1)" }}>{value}</span>
+                    <span className="tabular-nums" style={{ fontSize: "1.375rem", fontWeight: 750, letterSpacing: "-0.03em", lineHeight: 1, color: "var(--text-1)" }}>{value}</span>
                   </div>
                 ))}
               </div>
             </div>
 
             {/* At-risk courses */}
-            <div className="card">
+            <div className="card spotlight">
               <p className="label mb-4 flex items-center gap-2">
                 <AlertTriangle className="h-3.5 w-3.5 text-red-400" style={{ filter: "drop-shadow(0 0 4px #f87171)" }} /> At-risk Courses
               </p>
@@ -293,7 +342,7 @@ const StudentDashboard = () => {
         {/* Courses */}
         <div>
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>My Courses</h2>
+            <h2 style={{ fontSize: "0.8125rem", fontWeight: 650, letterSpacing: "-0.01em", color: "var(--text-1)" }}>My Courses</h2>
             <span className="badge badge-violet">{courses.length} {courses.length !== 1 ? "courses" : "course"}</span>
           </div>
 

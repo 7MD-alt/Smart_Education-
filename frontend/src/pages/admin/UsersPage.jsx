@@ -9,7 +9,16 @@ import {
   BookOpen, CalendarCheck, CheckCircle2,
   XCircle, Clock, TrendingUp, ShieldAlert, Skull,
   Mail, Hash, Layers, FileStack, FileUp, Table2,
+  ArrowUpDown,
 } from "lucide-react";
+
+const SORT_OPTIONS = [
+  { value: "newest",    label: "Last added"   },
+  { value: "oldest",    label: "First added"  },
+  { value: "name_asc",  label: "Name A → Z"   },
+  { value: "name_desc", label: "Name Z → A"   },
+  { value: "username",  label: "Username A → Z"},
+];
 
 const ROLES = {
   ADMIN:   { label: "Admin",   icon: ShieldCheck,   color: "text-pink-300",   bg: "bg-pink-500/15",   border: "border-pink-500/30"   },
@@ -433,7 +442,7 @@ function computeStudentPassword(firstName, massarCode) {
   return `${name}${digits}` || "student1234";
 }
 
-const UserFormModal = ({ open, onClose, onSaved, user, departments, filieres, showToast }) => {
+const UserFormModal = ({ open, onClose, onSaved, user, departments, filieres, showToast, studentCount = 0 }) => {
   const isEdit = !!user;
   const [step, setStep] = useState(1);
   const [createdStudent, setCreatedStudent] = useState(null);
@@ -453,7 +462,7 @@ const UserFormModal = ({ open, onClose, onSaved, user, departments, filieres, sh
                 student_id:"", massar_code:"", filiere_id:"", semester:1, department_id:"" });
     } else {
       setForm({ username:"", email:"", first_name:"", last_name:"", role:"STUDENT",
-                password:"", is_active:true, student_id:"", massar_code:"", filiere_id:"", semester:1, department_id:"" });
+                password:"", is_active:true, student_id:String(studentCount + 1), massar_code:"", filiere_id:"", semester:1, department_id:"" });
     }
     setStep(1); setCreatedStudent(null); setErr(""); setShowPwd(false);
   }, [user, open]);
@@ -551,7 +560,7 @@ const UserFormModal = ({ open, onClose, onSaved, user, departments, filieres, sh
                     {Object.entries(ROLES).map(([key,r]) => {
                       const Icon = r.icon; const sel = form.role===key;
                       return (
-                        <button key={key} type="button" onClick={() => setForm(p=>({...p,role:key}))}
+                        <button key={key} type="button" onClick={() => setForm(p=>({...p, role:key, student_id: key==="STUDENT" && !p.student_id ? String(studentCount + 1) : p.student_id}))}
                                 className={`flex flex-col items-center gap-1 rounded-xl border px-3 py-3 transition ${sel?`${r.border} ${r.bg} ${r.color}`:"border-white/10 bg-white/[0.03] text-white/40 hover:border-white/20"}`}>
                           <Icon className="h-4 w-4" /><span className="text-xs font-medium">{r.label}</span>
                         </button>
@@ -919,6 +928,7 @@ const UsersPage = () => {
   const [filiereFilter,   setFiliereFilter]   = useState("");      // filiere id or ""
   const [semesterFilter,  setSemesterFilter]  = useState("");      // "1".."10" or ""
   const [deptFilter,      setDeptFilter]      = useState("");      // department id or ""
+  const [sortBy,          setSortBy]          = useState("newest");
   const [loading,         setLoading]         = useState(true);
   const [modalOpen,       setModalOpen]       = useState(false);
   const [editingUser,     setEditingUser]     = useState(null);
@@ -962,6 +972,7 @@ const UsersPage = () => {
   const clearAll = () => {
     setSearch(""); setRoleFilter("ALL"); setStatusFilter("ALL");
     setFaceFilter("ALL"); setFiliereFilter(""); setSemesterFilter(""); setDeptFilter("");
+    setSortBy("newest");
   };
 
   const getSP = (uid) => studentProfiles.find(p => (p.user?.id ?? p.user) === uid);
@@ -1016,6 +1027,15 @@ const UsersPage = () => {
       if (!nameMatch && !usernameMatch && !emailMatch && !studentIdMatch) return false;
     }
     return true;
+  }).sort((a, b) => {
+    if (sortBy === "newest")    return b.id - a.id;
+    if (sortBy === "oldest")    return a.id - b.id;
+    if (sortBy === "username")  return a.username.localeCompare(b.username);
+    const nameA = `${a.first_name||""} ${a.last_name||""}`.trim().toLowerCase();
+    const nameB = `${b.first_name||""} ${b.last_name||""}`.trim().toLowerCase();
+    if (sortBy === "name_asc")  return nameA.localeCompare(nameB);
+    if (sortBy === "name_desc") return nameB.localeCompare(nameA);
+    return 0;
   });
 
   const counts = {
@@ -1025,7 +1045,7 @@ const UsersPage = () => {
     STUDENT: users.filter(u=>u.role==="STUDENT").length,
   };
 
-  const hasActiveFilters = statusFilter !== "ALL" || faceFilter !== "ALL" || filiereFilter || semesterFilter || deptFilter || search;
+  const hasActiveFilters = statusFilter !== "ALL" || faceFilter !== "ALL" || filiereFilter || semesterFilter || deptFilter || search || sortBy !== "newest";
 
   return (
     <DashboardLayout>
@@ -1073,6 +1093,22 @@ const UsersPage = () => {
                   <X className="h-3.5 w-3.5" />
                 </button>
               )}
+            </div>
+
+            {/* Sort */}
+            <div className="flex items-center gap-1.5 rounded-[var(--radius)] px-3 py-2"
+                 style={{ border:"1px solid var(--border)", background:"var(--surface)" }}>
+              <ArrowUpDown className="h-3.5 w-3.5 shrink-0" style={{ color:"var(--text-3)" }} />
+              <select
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value)}
+                className="bg-transparent text-xs font-medium outline-none cursor-pointer"
+                style={{ color: sortBy !== "newest" ? "#a78bfa" : "var(--text-2)" }}
+              >
+                {SORT_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value} className="bg-[#0c1120] text-white">{o.label}</option>
+                ))}
+              </select>
             </div>
 
             {/* Result count */}
@@ -1261,7 +1297,8 @@ const UsersPage = () => {
       </div>
 
       <UserFormModal open={modalOpen} onClose={() => setModalOpen(false)} onSaved={fetchAll}
-                     user={editingUser} departments={departments} filieres={filieres} showToast={showToast} />
+                     user={editingUser} departments={departments} filieres={filieres} showToast={showToast}
+                     studentCount={studentProfiles.length} />
       <FaceOnlyModal open={!!faceTarget} onClose={() => setFaceTarget(null)} studentProfile={faceTarget} onSaved={fetchAll} showToast={showToast} />
       <DeleteConfirm user={deleteTarget} onCancel={() => setDeleteTarget(null)} onConfirm={handleDelete} deleting={deleting} />
       <UserDetailModal open={!!detailTarget} onClose={() => setDetailTarget(null)} userId={detailTarget?.userId} role={detailTarget?.role} />

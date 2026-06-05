@@ -29,9 +29,20 @@ const DangerZonePage = () => {
   const sendAlerts = async () => {
     setSending(true);
     try {
-      const res = await axiosClient.post(`teacher/courses/${courseId}/send-alerts/`);
-      toast.success(res.data.message || `Alerts sent to ${res.data.sent} student(s).`);
-    } catch { toast.error("Failed to send alerts."); }
+      // Trigger n8n webhook — n8n fetches danger zone students and emails them via Django
+      await fetch("http://localhost:5678/webhook/campuseye-danger-alerts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ course_id: courseId }),
+      });
+      toast.success("Alert workflow triggered — emails are being sent to at-risk students.");
+    } catch {
+      // Fallback: call Django directly if n8n is unreachable
+      try {
+        const res = await axiosClient.post(`teacher/courses/${courseId}/send-alerts/`);
+        toast.success(res.data.message || `Alerts sent to ${res.data.sent} student(s).`);
+      } catch { toast.error("Failed to send alerts. Make sure n8n is running."); }
+    }
     finally { setSending(false); }
   };
 

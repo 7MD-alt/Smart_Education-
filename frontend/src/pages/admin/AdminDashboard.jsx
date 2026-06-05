@@ -12,30 +12,68 @@ import {
 /* ── Animated stat card ──────────────────────────────────────── */
 const StatCard = ({ label, value, icon: Icon, accent, glow, delay = 0 }) => (
   <div
-    className="stat-card fade-up group cursor-default"
-    style={{ animationDelay: `${delay}ms`, "--accent-color": accent }}
+    className="fade-up group cursor-default relative overflow-hidden rounded-[var(--radius-lg)] p-6 spotlight"
+    style={{
+      animationDelay: `${delay}ms`,
+      background: "var(--surface)",
+      backdropFilter: "blur(20px)",
+      border: `1px solid ${accent}18`,
+      boxShadow: `0 0 40px ${glow.replace("0.15","0.06")}`,
+      transition: "border-color 220ms, box-shadow 220ms, transform 220ms",
+    }}
+    onMouseEnter={e => {
+      e.currentTarget.style.borderColor = `${accent}45`;
+      e.currentTarget.style.boxShadow = `0 0 60px ${glow.replace("0.15","0.18")}, 0 8px 32px rgba(0,0,0,0.4)`;
+      e.currentTarget.style.transform = "translateY(-3px)";
+      const bar = e.currentTarget.querySelector("[data-accent-bar]");
+      if (bar) bar.style.transform = "scaleX(1)";
+    }}
+    onMouseLeave={e => {
+      e.currentTarget.style.borderColor = `${accent}18`;
+      e.currentTarget.style.boxShadow = `0 0 40px ${glow.replace("0.15","0.06")}`;
+      e.currentTarget.style.transform = "translateY(0)";
+      const bar = e.currentTarget.querySelector("[data-accent-bar]");
+      if (bar) bar.style.transform = "scaleX(0)";
+    }}
   >
-    {/* Background glow */}
-    <div
-      className="pointer-events-none absolute right-0 top-0 h-24 w-24 rounded-full"
-      style={{ background: glow, filter: "blur(30px)", opacity: 0.5 }}
-    />
+    {/* Large ambient glow blob */}
+    <div className="pointer-events-none absolute -right-6 -top-6 h-32 w-32 rounded-full"
+      style={{ background: `radial-gradient(circle, ${accent}30 0%, transparent 70%)`, filter: "blur(20px)" }} />
+    {/* Bottom accent bar — slides in on hover */}
+    <div data-accent-bar className="pointer-events-none absolute bottom-0 left-0 right-0 h-[2px]"
+      style={{
+        background: `linear-gradient(90deg, transparent, ${accent}60, transparent)`,
+        transform: "scaleX(0)", transformOrigin: "left",
+        transition: "transform 400ms cubic-bezier(0.16,1,0.3,1)",
+      }} />
 
-    <div className="relative flex items-start justify-between">
-      <p className="stat-label">{label}</p>
+    <div className="relative flex items-start justify-between mb-4">
+      <p className="label">{label}</p>
       <div
-        className="flex h-8 w-8 items-center justify-center rounded-[var(--radius)] transition-transform duration-200 group-hover:scale-110"
-        style={{ background: glow, border: `1px solid ${accent}30` }}
+        className="flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-300 group-hover:scale-110"
+        style={{
+          background: `linear-gradient(135deg, ${accent}25, ${accent}12)`,
+          border: `1px solid ${accent}35`,
+          boxShadow: `0 0 16px ${accent}25`,
+        }}
       >
-        <Icon className="h-4 w-4" style={{ color: accent, filter: `drop-shadow(0 0 4px ${accent})` }} />
+        <Icon className="h-5 w-5" style={{ color: accent, filter: `drop-shadow(0 0 4px ${accent})` }} />
       </div>
     </div>
-    <p className="stat-value count-enter relative" style={{ animationDelay: `${delay + 100}ms` }}>
+    <p
+      className="count-enter relative"
+      style={{
+        fontSize: "2.5rem", fontWeight: 750, letterSpacing: "-0.05em",
+        color: accent, lineHeight: 1,
+        textShadow: `0 0 32px ${accent}65`,
+        animationDelay: `${delay + 100}ms`,
+      }}
+    >
       {value ?? "—"}
     </p>
-    <div className="mt-2 flex items-center gap-1 text-xs" style={{ color: "var(--text-3)" }}>
+    <div className="mt-3 flex items-center gap-1.5 text-xs" style={{ color: "var(--text-3)" }}>
       <TrendingUp className="h-3 w-3" style={{ color: accent }} />
-      <span>Platform metric</span>
+      <span>Platform total</span>
     </div>
   </div>
 );
@@ -50,11 +88,11 @@ const UserBreakdown = ({ admins = 0, teachers = 0, students = 0 }) => {
   ];
 
   return (
-    <div className="card h-full">
+    <div className="card spotlight h-full">
       <div className="flex items-center justify-between">
         <div>
           <p className="label">User Distribution</p>
-          <p className="mt-1.5 text-2xl font-bold tabular-nums" style={{ color: "var(--text-1)" }}>
+          <p className="mt-1.5 tabular-nums" style={{ fontSize: "1.75rem", fontWeight: 750, letterSpacing: "-0.03em", lineHeight: 1.2, color: "var(--text-1)" }}>
             {total}{" "}
             <span className="text-sm font-normal" style={{ color: "var(--text-3)" }}>total users</span>
           </p>
@@ -113,38 +151,56 @@ const UserBreakdown = ({ admins = 0, teachers = 0, students = 0 }) => {
 const ManageCard = ({ to, title, description, icon: Icon, count, accent, glow, delay = 0 }) => (
   <Link to={to} className="group block fade-up" style={{ animationDelay: `${delay}ms` }}>
     <div
-      className="relative flex items-center gap-4 overflow-hidden rounded-[var(--radius-lg)] p-4 transition-all duration-200"
-      style={{ border: "1px solid var(--border)", background: "var(--surface)" }}
+      className="spotlight relative flex items-center gap-4 overflow-hidden rounded-[var(--radius-lg)] p-5"
+      style={{
+        border: `1px solid ${accent}15`,
+        background: "var(--surface)",
+        backdropFilter: "blur(20px)",
+        transition: "border-color 200ms, box-shadow 200ms, transform 200ms, background 200ms",
+      }}
       onMouseEnter={e => {
         e.currentTarget.style.borderColor = `${accent}40`;
-        e.currentTarget.style.background = `linear-gradient(135deg, ${glow}, var(--surface))`;
-        e.currentTarget.style.boxShadow = `0 4px 24px ${glow}`;
+        e.currentTarget.style.background = `rgba(6,6,22,0.9)`;
+        e.currentTarget.style.boxShadow = `0 0 40px ${glow}, 0 8px 32px rgba(0,0,0,0.4), inset 0 0 40px ${glow.replace("0.12","0.04")}`;
+        e.currentTarget.style.transform = "translateY(-2px)";
       }}
       onMouseLeave={e => {
-        e.currentTarget.style.borderColor = "var(--border)";
+        e.currentTarget.style.borderColor = `${accent}15`;
         e.currentTarget.style.background = "var(--surface)";
         e.currentTarget.style.boxShadow = "none";
+        e.currentTarget.style.transform = "translateY(0)";
       }}
     >
       {/* Top shimmer */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px"
-           style={{ background: `linear-gradient(90deg, transparent, ${accent}20, transparent)` }} />
+        style={{ background: `linear-gradient(90deg, transparent, ${accent}35, transparent)` }} />
 
       <div
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius)] transition-transform duration-200 group-hover:scale-110"
-        style={{ background: glow, border: `1px solid ${accent}30` }}
+        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl transition-all duration-300 group-hover:scale-110"
+        style={{
+          background: `linear-gradient(135deg, ${accent}25, ${accent}12)`,
+          border: `1px solid ${accent}35`,
+          boxShadow: `0 0 20px ${accent}20`,
+        }}
       >
-        <Icon className="h-4.5 w-4.5" style={{ color: accent, width: 18, height: 18 }} />
+        <Icon style={{ color: accent, width: 20, height: 20, filter: `drop-shadow(0 0 4px ${accent})` }} />
       </div>
+
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>{title}</p>
-        <p className="text-xs" style={{ color: "var(--text-3)" }}>{description}</p>
+        <p className="text-sm font-bold" style={{ color: "var(--text-1)", letterSpacing: "-0.015em" }}>{title}</p>
+        <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>{description}</p>
       </div>
-      <div className="flex items-center gap-2">
-        <span className="text-xl font-bold tabular-nums" style={{ color: accent }}>{count ?? 0}</span>
+
+      <div className="flex flex-col items-end gap-1">
+        <span
+          className="tabular-nums"
+          style={{ fontSize: "1.75rem", fontWeight: 750, letterSpacing: "-0.04em", lineHeight: 1, color: accent, filter: `drop-shadow(0 0 6px ${accent}80)` }}
+        >
+          {count ?? 0}
+        </span>
         <ArrowUpRight
-          className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
-          style={{ color: accent, opacity: 0.5 }}
+          className="h-4 w-4 transition-all duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 opacity-0 group-hover:opacity-100"
+          style={{ color: accent }}
         />
       </div>
     </div>
@@ -200,21 +256,23 @@ const AdminDashboard = () => {
         {/* Header */}
         <div className="page-header fade-up">
           <div>
-            <p className="label mb-1">Admin Panel</p>
-            <h1 className="page-title">
-              Welcome back,{" "}
+            <div className="flex items-center gap-2 mb-3">
+              <div className="h-px flex-1 max-w-[40px]"
+                style={{ background: "linear-gradient(90deg, rgba(244,114,182,0.5), transparent)" }} />
+              <p className="label">Admin Command Center</p>
+            </div>
+            <h1 style={{ fontSize: "2.25rem", fontWeight: 750, letterSpacing: "-0.04em", color: "#f0f0ff", lineHeight: 1.1 }}>
+              Welcome,{" "}
               <span style={{
-                background: "linear-gradient(135deg, #f472b6, #a78bfa)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
+                background: "linear-gradient(135deg, #f472b6 0%, #a78bfa 50%, #22d3ee 100%)",
+                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
               }}>{firstName}</span>
             </h1>
-            <p className="page-sub">Your platform overview — everything at a glance.</p>
+            <p className="page-sub mt-2">Full platform overview · {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</p>
           </div>
           <Link to="/admin/users">
-            <button className="btn-primary gap-1.5">
-              <Plus className="h-4 w-4" /> Add User
+            <button className="btn-primary gap-1.5 px-5 py-2.5">
+              <Plus className="h-4 w-4" /> New User
             </button>
           </Link>
         </div>
@@ -247,7 +305,7 @@ const AdminDashboard = () => {
               ].map(({ to, label, value, icon: Icon, accent, glow }) => (
                 <Link to={to} key={label} className="group flex-1 block">
                   <div
-                    className="relative h-full overflow-hidden rounded-[var(--radius-lg)] p-5 transition-all duration-200"
+                    className="spotlight relative h-full overflow-hidden rounded-[var(--radius-lg)] p-5 transition-all duration-200"
                     style={{ border: "1px solid var(--border)", background: "var(--surface)" }}
                     onMouseEnter={e => { e.currentTarget.style.borderColor = `${accent}40`; e.currentTarget.style.background = `linear-gradient(135deg, ${glow}, var(--surface))`; }}
                     onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.background = "var(--surface)"; }}
@@ -263,7 +321,7 @@ const AdminDashboard = () => {
                       </div>
                       <ArrowUpRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: accent }} />
                     </div>
-                    <p className="mt-3 text-4xl font-bold tabular-nums" style={{ color: accent }}>{value}</p>
+                    <p className="mt-3 tabular-nums" style={{ fontSize: "2.25rem", fontWeight: 750, letterSpacing: "-0.04em", lineHeight: 1, color: accent, textShadow: `0 0 20px ${accent}50` }}>{value}</p>
                   </div>
                 </Link>
               ))}
@@ -275,7 +333,7 @@ const AdminDashboard = () => {
         {!loading && (
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Quick Management</h2>
+              <h2 style={{ fontSize: "0.8125rem", fontWeight: 650, letterSpacing: "-0.01em", color: "var(--text-1)" }}>Quick Management</h2>
               <span className="text-xs" style={{ color: "var(--text-3)" }}>Click any card to manage</span>
             </div>
             <div className="grid gap-3 md:grid-cols-2 stagger">
@@ -285,7 +343,7 @@ const AdminDashboard = () => {
         )}
 
         {/* Platform status */}
-        <div className="card fade-up" style={{ animationDelay: "350ms" }}>
+        <div className="card spotlight fade-up" style={{ animationDelay: "350ms" }}>
           <div className="flex items-center gap-2 mb-4">
             <Activity className="h-4 w-4" style={{ color: "#4ade80" }} />
             <p className="label">Platform Status</p>

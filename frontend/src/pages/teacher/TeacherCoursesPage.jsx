@@ -25,93 +25,118 @@ const CourseCard = ({ course, index, onDownload, downloading }) => {
 
   return (
     <div
-      className="group relative overflow-hidden rounded-[var(--radius-lg)] flex flex-col transition-all duration-200"
-      style={{ border: "1px solid var(--border)", background: "var(--surface)" }}
-      onMouseEnter={e => { e.currentTarget.style.borderColor = `${accent}45`; e.currentTarget.style.boxShadow = `0 4px 28px ${glow}`; }}
-      onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.boxShadow = "none"; }}
+      className="group relative overflow-hidden rounded-[var(--radius-lg)] flex flex-col"
+      style={{
+        border: `1px solid ${accent}18`,
+        background: "var(--surface)",
+        backdropFilter: "blur(20px)",
+        transition: "border-color 220ms, box-shadow 220ms, transform 220ms",
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.borderColor = `${accent}42`;
+        e.currentTarget.style.boxShadow = `0 0 50px ${glow.replace("0.15","0.18")}, 0 8px 32px rgba(0,0,0,0.4)`;
+        e.currentTarget.style.transform = "translateY(-2px)";
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.borderColor = `${accent}18`;
+        e.currentTarget.style.boxShadow = "none";
+        e.currentTarget.style.transform = "none";
+      }}
     >
-      {/* Accent top bar */}
-      <div className="absolute inset-x-0 top-0 h-0.5"
-           style={{ background: `linear-gradient(90deg, transparent, ${accent}, transparent)`, opacity: 0.8 }} />
+      {/* Accent top line — full width gradient */}
+      <div className="absolute inset-x-0 top-0 h-[2px]"
+        style={{ background: `linear-gradient(90deg, transparent 0%, ${accent} 50%, transparent 100%)` }} />
 
-      {/* Background glow orb */}
-      <div className="pointer-events-none absolute right-0 top-0 h-28 w-28 rounded-full"
-           style={{ background: glow, filter: "blur(35px)", opacity: 0.5 }} />
+      {/* Glow blob */}
+      <div className="pointer-events-none absolute -right-6 -top-6 h-32 w-32 rounded-full"
+        style={{ background: `radial-gradient(circle, ${accent}25 0%, transparent 70%)`, filter: "blur(20px)" }} />
 
-      {/* Card body */}
-      <div className="relative flex flex-col flex-1 p-5 gap-4">
+      {/* Body */}
+      <div className="relative flex flex-col flex-1 p-6 gap-5">
 
-        {/* Header row */}
-        <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius)]"
-               style={{ background: glow, border: `1px solid ${accent}30` }}>
-            <BookOpen className="h-5 w-5" style={{ color: accent }} />
+        {/* Header */}
+        <div className="flex items-start gap-4">
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl"
+            style={{
+              background: `linear-gradient(135deg, ${accent}26, ${accent}0c)`,
+              border: `1px solid ${accent}3a`,
+              boxShadow: `0 0 22px ${accent}22`,
+            }}>
+            <BookOpen className="h-8 w-8" style={{ color: accent, filter: `drop-shadow(0 0 6px ${accent})` }} />
           </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-base font-semibold leading-snug truncate" style={{ color: "var(--text-1)" }}>
+          <div className="flex-1 min-w-0 pt-0.5">
+            <h3 className="text-base font-bold leading-snug" style={{ color: "#f0f0ff", letterSpacing: "-0.015em" }}>
               {course.title}
             </h3>
             {course.filiere_names?.length > 0 && (
-              <p className="mt-0.5 text-xs truncate" style={{ color: "var(--text-3)" }}>
+              <p className="mt-1.5 text-xs" style={{ color: "rgba(110,110,140,0.85)" }}>
                 {course.filiere_names.join(" · ")}
               </p>
             )}
           </div>
         </div>
 
-        {/* Stats row */}
-        <div className="grid grid-cols-3 gap-2">
+        {/* Stats — 3 pills with icons */}
+        <div className="grid grid-cols-3 gap-2.5">
           {[
-            { icon: Users,    label: "Students",  value: course.student_count  ?? "—" },
-            { icon: FileStack, label: "Materials", value: course.material_count ?? "—" },
-            { icon: AlertTriangle, label: "Max abs.", value: course.max_absences },
-          ].map(({ icon: Icon, label, value }) => (
-            <div key={label} className="rounded-[var(--radius)] px-3 py-2 text-center"
-                 style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
-              <Icon className="h-3.5 w-3.5 mx-auto mb-1" style={{ color: "var(--text-3)" }} />
-              <p className="text-sm font-bold tabular-nums" style={{ color: "var(--text-1)" }}>{value}</p>
-              <p className="text-[10px]" style={{ color: "var(--text-3)" }}>{label}</p>
+            { icon: Users,         label: "Students",  value: course.student_count  ?? "—", c: accent },
+            { icon: FileStack,     label: "Materials", value: course.material_count ?? "—", c: accent },
+            { icon: AlertTriangle, label: "Max abs.",  value: course.max_absences,          c: "#fbbf24" },
+          ].map(({ icon: Icon, label, value, c }) => (
+            <div key={label} className="flex flex-col items-center gap-1.5 rounded-2xl px-2 py-3.5"
+              style={{ background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.07)" }}>
+              <Icon className="h-5 w-5" style={{ color: c, opacity: 0.9 }} />
+              <p className="text-xl font-bold tabular-nums leading-none" style={{ color: c, letterSpacing: "-0.03em" }}>{value}</p>
+              <p className="text-[9px] uppercase tracking-wider" style={{ color: "rgba(90,90,120,0.95)" }}>{label}</p>
             </div>
           ))}
         </div>
 
-        {/* Actions */}
-        <div className="flex flex-wrap gap-1.5 mt-auto">
-          <Link to={`/teacher/courses/${course.id}/seances`} className="flex-1">
-            <button className="w-full btn px-3 py-2 text-xs gap-1.5 justify-center text-cyan-400"
-                    style={{ border: "1px solid rgba(8,145,178,0.25)", background: "rgba(8,145,178,0.08)" }}>
-              <CalendarCheck className="h-3.5 w-3.5" /> Séances
-            </button>
-          </Link>
+        {/* Primary action */}
+        <Link to={`/teacher/courses/${course.id}/seances`} className="block mt-auto">
+          <button
+            className="w-full rounded-2xl py-3 text-sm font-bold transition-all"
+            style={{
+              background: `linear-gradient(135deg, ${accent}1e, ${accent}0a)`,
+              border: `1px solid ${accent}34`,
+              color: accent,
+              boxShadow: `0 0 16px ${accent}12`,
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = `${accent}26`; e.currentTarget.style.boxShadow = `0 0 26px ${accent}24`; }}
+            onMouseLeave={e => { e.currentTarget.style.background = `linear-gradient(135deg, ${accent}1e, ${accent}0a)`; e.currentTarget.style.boxShadow = `0 0 16px ${accent}12`; }}>
+            <div className="flex items-center justify-center gap-2">
+              <CalendarCheck className="h-5 w-5" /> Gérer les séances
+            </div>
+          </button>
+        </Link>
 
-          <Link to={`/teacher/courses/${course.id}/attendance`} className="flex-1">
-            <button className="w-full btn-ghost px-3 py-2 text-xs gap-1.5 justify-center">
-              <ClipboardList className="h-3.5 w-3.5" /> Manuel
-            </button>
-          </Link>
-
-          <Link to={`/teacher/courses/${course.id}/materials`} className="flex-1">
-            <button className="w-full btn-ghost px-3 py-2 text-xs gap-1.5 justify-center">
-              <Folder className="h-3.5 w-3.5" /> Materials
-            </button>
-          </Link>
-
-          <Link to={`/teacher/courses/${course.id}/danger-zone`} className="flex-1">
-            <button className="w-full btn px-3 py-2 text-xs gap-1.5 justify-center text-red-400"
-                    style={{ border: "1px solid rgba(185,28,28,0.25)", background: "rgba(185,28,28,0.08)" }}>
-              <Shield className="h-3.5 w-3.5" /> Danger
-            </button>
-          </Link>
-
+        {/* Secondary actions */}
+        <div className="grid grid-cols-4 gap-2">
+          {[
+            { to: `/teacher/courses/${course.id}/attendance`, icon: ClipboardList, label: "Manuel",    color: "rgba(139,92,246,0.4)"  },
+            { to: `/teacher/courses/${course.id}/materials`,  icon: Folder,        label: "Supports",  color: "rgba(100,100,130,0.4)" },
+            { to: `/teacher/courses/${course.id}/danger-zone`,icon: Shield,        label: "Danger",    color: "rgba(185,28,28,0.4)"   },
+          ].map(({ to, icon: Icon, label }) => (
+            <Link key={label} to={to}>
+              <button className="w-full flex flex-col items-center gap-1.5 rounded-2xl py-2.5 text-[10px] font-semibold uppercase tracking-wider transition-all"
+                style={{ background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.07)", color: "rgba(130,130,165,0.75)" }}
+                onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.07)"; e.currentTarget.style.color = "#f0f0ff"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.035)"; e.currentTarget.style.color = "rgba(130,130,165,0.75)"; }}>
+                <Icon className="h-5 w-5" /> {label}
+              </button>
+            </Link>
+          ))}
           <button
             onClick={() => onDownload(course)}
             disabled={downloading === course.id}
-            className="flex-1 btn px-3 py-2 text-xs gap-1.5 justify-center text-green-400 disabled:opacity-40"
-            style={{ border: "1px solid rgba(21,128,61,0.25)", background: "rgba(21,128,61,0.08)" }}
-          >
+            className="flex flex-col items-center gap-1.5 rounded-2xl py-2.5 text-[10px] font-semibold uppercase tracking-wider transition-all disabled:opacity-40"
+            style={{ background: "rgba(21,128,61,0.07)", border: "1px solid rgba(21,128,61,0.2)", color: "rgba(74,222,128,0.75)" }}
+            onMouseEnter={e => { e.currentTarget.style.background = "rgba(21,128,61,0.14)"; e.currentTarget.style.color = "#4ade80"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "rgba(21,128,61,0.07)"; e.currentTarget.style.color = "rgba(74,222,128,0.75)"; }}>
             {downloading === course.id
-              ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Generating…</>
-              : <><Download className="h-3.5 w-3.5" /> Report</>}
+              ? <Loader2 className="h-5 w-5 animate-spin" />
+              : <Download className="h-5 w-5" />}
+            {downloading === course.id ? "..." : "Rapport"}
           </button>
         </div>
       </div>

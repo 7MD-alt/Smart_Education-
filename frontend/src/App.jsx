@@ -13,7 +13,10 @@ import FaceRequestsPage      from "./pages/admin/FaceRequestsPage";
 
 import TeacherDashboard      from "./pages/teacher/TeacherDashboard";
 import TeacherProfilePage    from "./pages/teacher/TeacherProfilePage";
+import TeacherCoursesPage    from "./pages/teacher/TeacherCoursesPage";
 import ScanAttendance        from "./pages/teacher/ScanAttendance";
+import SeancesPage           from "./pages/teacher/SeancesPage";
+import SeanceRosterPage      from "./pages/teacher/SeanceRosterPage";
 import DangerZonePage        from "./pages/teacher/DangerZonePage";
 import TeacherMaterialsPage  from "./pages/teacher/TeacherMaterialsPage";
 import ManualAttendancePage  from "./pages/teacher/ManualAttendancePage";
@@ -21,7 +24,9 @@ import ManualAttendancePage  from "./pages/teacher/ManualAttendancePage";
 import StudentDashboard      from "./pages/student/StudentDashboard";
 import StudentProfilePage    from "./pages/student/StudentProfilePage";
 import StudentAttendancePage from "./pages/student/StudentAttendancePage";
-import StudentChatPage       from "./pages/student/StudentChatPage";
+import StudentChatPage            from "./pages/student/StudentChatPage";
+import NOVAAPage                  from "./pages/student/NOVAAPage";
+import StudentSeancesPage         from "./pages/student/StudentSeancesPage";
 import StudentCourseMaterialsPage from "./pages/student/StudentCourseMaterialsPage";
 
 import ProtectedRoute        from "./router/ProtectedRoute";
@@ -45,7 +50,10 @@ function App() {
         {/* ── Teacher ───────────────────────────────────────────────── */}
         <Route path="/teacher" element={<ProtectedRoute role="TEACHER"><TeacherDashboard /></ProtectedRoute>} />
         <Route path="/teacher/profile" element={<ProtectedRoute role="TEACHER"><TeacherProfilePage /></ProtectedRoute>} />
+        <Route path="/teacher/courses" element={<ProtectedRoute role="TEACHER"><TeacherCoursesPage /></ProtectedRoute>} />
         <Route path="/teacher/scan" element={<ProtectedRoute role="TEACHER"><ScanAttendance /></ProtectedRoute>} />
+        <Route path="/teacher/courses/:courseId/seances" element={<ProtectedRoute role="TEACHER"><SeancesPage /></ProtectedRoute>} />
+        <Route path="/teacher/seances/:seanceId/roster" element={<ProtectedRoute role="TEACHER"><SeanceRosterPage /></ProtectedRoute>} />
         <Route path="/teacher/courses/:courseId/danger-zone" element={<ProtectedRoute role="TEACHER"><DangerZonePage /></ProtectedRoute>} />
         <Route path="/teacher/courses/:courseId/materials" element={<ProtectedRoute role="TEACHER"><TeacherMaterialsPage /></ProtectedRoute>} />
         <Route path="/teacher/courses/:courseId/attendance" element={<ProtectedRoute role="TEACHER"><ManualAttendancePage /></ProtectedRoute>} />
@@ -54,7 +62,9 @@ function App() {
         <Route path="/student" element={<ProtectedRoute role="STUDENT"><StudentDashboard /></ProtectedRoute>} />
         <Route path="/student/profile" element={<ProtectedRoute role="STUDENT"><StudentProfilePage /></ProtectedRoute>} />
         <Route path="/student/attendance" element={<ProtectedRoute role="STUDENT"><StudentAttendancePage /></ProtectedRoute>} />
-        <Route path="/student/chat" element={<ProtectedRoute role="STUDENT"><StudentChatPage /></ProtectedRoute>} />
+        <Route path="/student/seances"  element={<ProtectedRoute role="STUDENT"><StudentSeancesPage /></ProtectedRoute>} />
+        <Route path="/student/chat"     element={<ProtectedRoute role="STUDENT"><StudentChatPage /></ProtectedRoute>} />
+        <Route path="/student/novaa"    element={<ProtectedRoute role="STUDENT"><NOVAAPage /></ProtectedRoute>} />
         <Route path="/student/courses/:courseId/materials" element={<ProtectedRoute role="STUDENT"><StudentCourseMaterialsPage /></ProtectedRoute>} />
 
         {/* ── Fallback ──────────────────────────────────────────────── */}

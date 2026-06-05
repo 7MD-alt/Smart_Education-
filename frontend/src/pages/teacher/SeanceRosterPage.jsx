@@ -7,7 +7,7 @@ import {
   Camera, CheckCircle2, XCircle, Clock, Loader2,
   ScanLine, Download, Users, Play, UserCheck, Sparkles,
   ChevronLeft, RefreshCw, AlertTriangle, FlaskConical,
-  GraduationCap,
+  GraduationCap, KeyRound,
 } from "lucide-react";
 
 // ── Status colours ────────────────────────────────────────────────────────────
@@ -74,12 +74,13 @@ const SeanceRosterPage = () => {
   const { seanceId } = useParams();
   const toast = useToast();
 
-  const [seance,    setSeance]    = useState(null);
-  const [roster,    setRoster]    = useState([]);
-  const [loading,   setLoading]   = useState(true);
-  const [scanning,  setScanning]  = useState(false);
-  const [toggling,  setToggling]  = useState(null);
-  const [justRec,   setJustRec]   = useState(new Set());
+  const [seance,      setSeance]      = useState(null);
+  const [roster,      setRoster]      = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [scanning,    setScanning]    = useState(false);
+  const [toggling,    setToggling]    = useState(null);
+  const [bulkLoading, setBulkLoading] = useState(null);
+  const [justRec,     setJustRec]     = useState(new Set());
   const [downloading, setDownloading] = useState(false);
   const [camMode,   setCamMode]   = useState(false);
   const videoRef   = useRef(null);
@@ -97,6 +98,14 @@ const SeanceRosterPage = () => {
 
   useEffect(() => { load(); }, [seanceId]);
 
+  // Stop the camera when leaving the page (prevents the webcam light staying on).
+  useEffect(() => {
+    return () => {
+      streamRef.current?.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    };
+  }, []);
+
   // ── Camera helpers ──────────────────────────────────────────────────────────
   const startCamera = async () => {
     const constraints = [
@@ -107,25 +116,41 @@ const SeanceRosterPage = () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia(c);
         streamRef.current = stream;
-        if (videoRef.current) videoRef.current.srcObject = stream;
-        setCamMode(true);
+        setCamMode(true);   // render the <video>; the effect below attaches the stream
         return;
       } catch { /* try next */ }
     }
     toast.error("Impossible d'accéder à la caméra. Vérifiez les permissions du navigateur.");
   };
 
+  // Attach the stream once the <video> element is actually in the DOM. (Setting
+  // srcObject inside startCamera failed: the element isn't rendered until camMode
+  // flips to true, so videoRef was still null and the feed stayed blank.)
+  useEffect(() => {
+    if (camMode && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.play?.().catch(() => {});
+    }
+  }, [camMode]);
+
   const stopCamera = () => {
     streamRef.current?.getTracks().forEach(t => t.stop());
+    streamRef.current = null;
     setCamMode(false);
   };
 
   const captureAndScan = async () => {
-    if (!videoRef.current) return;
+    const video = videoRef.current;
+    if (!video) return;
+    // Guard: camera may not be ready yet (videoWidth 0 → blank capture).
+    if (!video.videoWidth || !video.videoHeight) {
+      toast.error("La caméra n'est pas encore prête. Patientez une seconde puis réessayez.");
+      return;
+    }
     const canvas = document.createElement("canvas");
-    canvas.width  = videoRef.current.videoWidth;
-    canvas.height = videoRef.current.videoHeight;
-    canvas.getContext("2d").drawImage(videoRef.current, 0, 0);
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d").drawImage(video, 0, 0);
 
     canvas.toBlob(async (blob) => {
       setScanning(true);
@@ -161,9 +186,26 @@ const SeanceRosterPage = () => {
       const res = await axiosClient.post(`teacher/seances/${seanceId}/manual/`, {
         records: [{ student_id: studentId, status: newStatus }],
       });
-      setRoster(res.data.roster || []);
+      // Put the toggled student at the end so they sink to the bottom of their group
+      const newRoster = res.data.roster || [];
+      const toggled = newRoster.find(s => s.student_id === studentId);
+      const others  = newRoster.filter(s => s.student_id !== studentId);
+      setRoster(toggled ? [...others, toggled] : newRoster);
     } catch { toast.error("Erreur lors de la mise à jour."); }
     finally { setToggling(null); }
+  };
+
+  // ── Bulk mark all ──────────────────────────────────────────────────────────
+  const handleMarkAll = async (newStatus) => {
+    if (roster.length === 0 || bulkLoading) return;
+    setBulkLoading(newStatus);
+    try {
+      const records = roster.map(s => ({ student_id: s.student_id, status: newStatus }));
+      const res = await axiosClient.post(`teacher/seances/${seanceId}/manual/`, { records });
+      setRoster(res.data.roster || []);
+      toast.success(`Tous les étudiants marqués "${STATUS[newStatus].label}".`);
+    } catch { toast.error("Erreur lors de la mise à jour."); }
+    finally { setBulkLoading(null); }
   };
 
   // ── Download report ─────────────────────────────────────────────────────────
@@ -261,6 +303,26 @@ const SeanceRosterPage = () => {
           ))}
         </div>
 
+        {/* Check-in code banner — teacher reads this out; never sent to students */}
+        {seance?.check_in_code && (
+          <div className="fade-up flex items-center justify-between gap-3 rounded-[var(--radius-lg)] px-4 py-3"
+               style={{ animationDelay: "40ms", background: "rgba(34,211,238,0.06)", border: "1px solid rgba(34,211,238,0.25)" }}>
+            <div className="flex items-center gap-2.5">
+              <KeyRound className="h-5 w-5 text-cyan-400 shrink-0" />
+              <div>
+                <p className="text-xs font-semibold" style={{ color: "var(--text-1)" }}>Code de présence</p>
+                <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
+                  Dictez-le en classe — les étudiants l'entrent avant la reconnaissance faciale.
+                </p>
+              </div>
+            </div>
+            <span className="rounded-[var(--radius)] px-4 py-2 text-2xl font-bold tracking-[0.25em] tabular-nums"
+                  style={{ background: "var(--bg)", border: "1px solid rgba(34,211,238,0.4)", color: "#22d3ee" }}>
+              {seance.check_in_code}
+            </span>
+          </div>
+        )}
+
         {/* Attendance rate */}
         <div className="fade-up" style={{ animationDelay: "60ms" }}>
           <div className="flex justify-between text-xs mb-1.5" style={{ color: "var(--text-3)" }}>
@@ -330,6 +392,34 @@ const SeanceRosterPage = () => {
             </span>
             <span className="badge badge-cyan">{roster.length} étudiants</span>
           </div>
+
+          {/* Bulk actions */}
+          {roster.length > 0 && (
+            <div className="flex items-center gap-2 mb-3 p-2 rounded-[var(--radius)]"
+                 style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+              <span className="text-[11px] font-medium shrink-0" style={{ color: "var(--text-3)" }}>
+                Tous marquer :
+              </span>
+              {[
+                { st: "PRESENT", label: "Présents",  color: "#4ade80", border: "rgba(21,128,61,0.3)",  bg: "rgba(21,128,61,0.1)"  },
+                { st: "LATE",    label: "En retard", color: "#fbbf24", border: "rgba(180,83,9,0.3)",   bg: "rgba(180,83,9,0.1)"   },
+                { st: "ABSENT",  label: "Absents",   color: "#f87171", border: "rgba(185,28,28,0.3)",  bg: "rgba(185,28,28,0.1)"  },
+              ].map(({ st, label, color, border, bg }) => (
+                <button
+                  key={st}
+                  onClick={() => handleMarkAll(st)}
+                  disabled={!!bulkLoading}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-semibold transition-all disabled:opacity-40"
+                  style={{ color, border: `1px solid ${border}`, background: bg }}
+                >
+                  {bulkLoading === st
+                    ? <Loader2 className="h-3 w-3 animate-spin" />
+                    : (() => { const Icon = STATUS[st].icon; return <Icon className="h-3 w-3" />; })()}
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
 
           {roster.length === 0 ? (
             <div className="empty-state">

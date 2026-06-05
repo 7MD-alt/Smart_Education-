@@ -18,6 +18,9 @@ SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "django-insecure-!w%sz*+(=)pwj_
 
 DEBUG = os.environ.get("DEBUG", "True") == "True"
 
+# ── NOVAA HUD integration ──────────────────────────────────────────────────
+HUD_SECRET_TOKEN = os.environ.get("HUD_SECRET_TOKEN", "novaa-hud-2024")
+
 ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
 # Add Render host automatically
@@ -259,6 +262,14 @@ EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
 CAMPUSEYE_FRONTEND_URL = os.environ.get("CAMPUSEYE_FRONTEND_URL", "http://localhost:5173")
+
+# ── n8n integration ────────────────────────────────────────────────────────
+# Set this in your .env file — must match N8N_SECRET_TOKEN in docker-compose
+N8N_SECRET_TOKEN = os.environ.get("N8N_SECRET_TOKEN", "changeme-use-a-long-random-string")
+
+# Webhook URL of the "Online Séance Scheduler" n8n workflow (creates the Jitsi
+# meeting + emails students). Copy it from the workflow's Webhook node.
+N8N_ONLINE_SEANCE_WEBHOOK = os.environ.get("N8N_ONLINE_SEANCE_WEBHOOK", "")
 
 
 # ==========================================

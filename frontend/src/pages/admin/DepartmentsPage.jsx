@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import axiosClient from "../../api/axiosClient";
 import DashboardLayout from "../../components/layout/DashboardLayout";
-import { Building2, Plus, Search, Edit2, Trash2, X, AlertCircle, Layers } from "lucide-react";
+import { Building2, Plus, Search, Edit2, Trash2, X, AlertCircle, Layers, Eye, GraduationCap } from "lucide-react";
 
 /* ── Shared modal primitives ─────────────────────────────────── */
 const FormModal = ({ open, onClose, title, children, onSubmit, saving }) => {
@@ -53,15 +53,104 @@ const DeleteModal = ({ open, name, onClose, onConfirm, deleting, description }) 
   );
 };
 
+const DeptDetailModal = ({ open, onClose, dept, filieres, students }) => {
+  if (!open || !dept) return null;
+
+  const deptFilieres = filieres.filter(f => (f.department?.id ?? f.department) === dept.id);
+  const totalStudents = students.filter(s => {
+    const fid = s.filiere?.id ?? s.filiere;
+    return deptFilieres.some(f => f.id === fid);
+  }).length;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.75)" }}>
+      <div className="relative flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0c1120] shadow-2xl">
+
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 border border-blue-500/25">
+              <Building2 className="h-5 w-5 text-blue-400" />
+            </div>
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-widest text-white/30">Department</p>
+              <h3 className="text-lg font-semibold text-white">{dept.name}</h3>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-white/40 hover:text-white transition"><X className="h-5 w-5" /></button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: "Code",     value: dept.code,             color: "text-blue-300"   },
+              { label: "Filieres", value: deptFilieres.length,   color: "text-violet-300" },
+              { label: "Students", value: totalStudents,          color: "text-green-300"  },
+            ].map(({ label, value, color }) => (
+              <div key={label} className="rounded-xl border border-white/8 bg-white/[0.03] p-4 text-center">
+                <p className={`text-xl font-bold ${color}`}>{value}</p>
+                <p className="text-[10px] text-white/30 mt-0.5">{label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Filieres list */}
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wider text-white/30 mb-3">Filieres</p>
+            {deptFilieres.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <Layers className="h-7 w-7 text-white/15 mb-2" />
+                <p className="text-sm text-white/40">No filieres in this department yet.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {deptFilieres.map(f => {
+                  const ct = students.filter(s => (s.filiere?.id ?? s.filiere) === f.id).length;
+                  return (
+                    <div key={f.id} className="flex items-center justify-between rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-pink-500/10 border border-pink-500/20">
+                          <Layers className="h-3.5 w-3.5 text-pink-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-white">{f.name}</p>
+                          <p className="text-[10px] text-white/40">{f.code}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs text-white/50">
+                        <GraduationCap className="h-3.5 w-3.5" />
+                        {ct} student{ct !== 1 ? "s" : ""}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex justify-end border-t border-white/10 px-6 py-4">
+          <button onClick={onClose} className="rounded-lg border border-white/10 px-5 py-2 text-sm text-white/60 hover:bg-white/[0.05] transition">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 /* ── Main ────────────────────────────────────────────────────── */
 const DepartmentsPage = () => {
   const [departments, setDepartments] = useState([]);
   const [filieres,    setFilieres]    = useState([]);
+  const [students,    setStudents]    = useState([]);
   const [search,      setSearch]      = useState("");
   const [loading,     setLoading]     = useState(true);
   const [modalOpen,   setModalOpen]   = useState(false);
   const [editing,     setEditing]     = useState(null);
   const [delTarget,   setDelTarget]   = useState(null);
+  const [detailTarget,setDetailTarget]= useState(null);
   const [deleting,    setDeleting]    = useState(false);
   const [saving,      setSaving]      = useState(false);
   const [form,        setForm]        = useState({ code: "", name: "" });
@@ -72,9 +161,14 @@ const DepartmentsPage = () => {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [d, f] = await Promise.all([axiosClient.get("departments/"), axiosClient.get("filieres/")]);
+      const [d, f, s] = await Promise.all([
+        axiosClient.get("departments/"),
+        axiosClient.get("filieres/"),
+        axiosClient.get("student-profiles/"),
+      ]);
       setDepartments(Array.isArray(d.data) ? d.data : d.data.results || []);
       setFilieres(Array.isArray(f.data) ? f.data : f.data.results || []);
+      setStudents(Array.isArray(s.data) ? s.data : s.data.results || []);
     } catch { /* non-critical */ }
     finally { setLoading(false); }
   };
@@ -177,6 +271,12 @@ const DepartmentsPage = () => {
                     </td>
                     <td>
                       <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => setDetailTarget(d)}
+                                className="btn p-2 text-blue-400"
+                                style={{ border: "1px solid rgba(59,130,246,0.2)", background: "rgba(59,130,246,0.06)" }}
+                                title="View details">
+                          <Eye className="h-3.5 w-3.5" />
+                        </button>
                         <button onClick={() => openEdit(d)} className="btn-ghost p-2 text-xs"><Edit2 className="h-3.5 w-3.5" /></button>
                         <button onClick={() => setDelTarget(d)} className="btn p-2 text-red-400"
                                 style={{ border: "1px solid rgba(185,28,28,0.2)", background: "rgba(185,28,28,0.06)" }}>
@@ -213,6 +313,9 @@ const DepartmentsPage = () => {
       <DeleteModal open={!!delTarget} name={delTarget?.name} onClose={() => setDelTarget(null)}
                    onConfirm={handleDelete} deleting={deleting}
                    description={`"${delTarget?.name}" and all its associated filieres will be permanently deleted.`} />
+
+      <DeptDetailModal open={!!detailTarget} onClose={() => setDetailTarget(null)}
+                       dept={detailTarget} filieres={filieres} students={students} />
     </DashboardLayout>
   );
 };

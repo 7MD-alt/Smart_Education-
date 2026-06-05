@@ -1,0 +1,95 @@
+{
+  "name": "CampusEye — NOVAA Research Enrichment",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "campuseye-research",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Research webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "campuseye-research"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.duckduckgo.com/?q={{ encodeURIComponent($json.body.query) }}&format=json&no_html=1&skip_disambig=1",
+        "options": { "timeout": 10000 }
+      },
+      "id": "duckduckgo-search",
+      "name": "Search DuckDuckGo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.item.json;\nconst query = $('Research webhook').item.json.body.query || '';\nconst queryId = $('Research webhook').item.json.body.query_id || '';\n\n// Extract useful content from DuckDuckGo response\nconst abstract = data.Abstract || '';\nconst abstractSource = data.AbstractSource || '';\nconst abstractURL = data.AbstractURL || '';\nconst definition = data.Definition || '';\nconst definitionSource = data.DefinitionSource || '';\nconst answer = data.Answer || '';\n\n// Related topics\nconst topics = (data.RelatedTopics || []).slice(0, 5).map(t => {\n  if (t.Text) return t.Text;\n  if (t.Topics) return t.Topics.slice(0, 2).map(st => st.Text || '').join(' | ');\n  return '';\n}).filter(Boolean);\n\n// Build content block\nconst parts = [];\nif (answer) parts.push(`Quick Answer: ${answer}`);\nif (abstract) parts.push(`Overview (${abstractSource}): ${abstract}`);\nif (definition) parts.push(`Definition (${definitionSource}): ${definition}`);\nif (topics.length) parts.push(`Related: ${topics.join(' • ')}`);\n\nconst content = parts.join('\\n\\n') || `No direct results found for: ${query}`;\nconst sources = [];\nif (abstractURL) sources.push(abstractURL);\nif (data.DefinitionURL) sources.push(data.DefinitionURL);\n\nreturn [{ json: { query_id: queryId, content, sources } }];"
+      },
+      "id": "extract-content",
+      "name": "Extract & format results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://127.0.0.1:8000/api/n8n/research-enrich/",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "X-N8N-Token", "value": "campuseye-n8n-secret-2026" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ \"query_id\": $json.query_id, \"content\": $json.content, \"sources\": $json.sources }) }}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "send-to-django",
+      "name": "Send result to Django cache",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ \"ok\": true, \"query_id\": $('Extract & format results').item.json.query_id, \"content_length\": $('Extract & format results').item.json.content.length }) }}"
+      },
+      "id": "respond",
+      "name": "Respond to NOVAA",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1120, 300]
+    }
+  ],
+  "connections": {
+    "Research webhook": {
+      "main": [[{ "node": "Search DuckDuckGo", "type": "main", "index": 0 }]]
+    },
+    "Search DuckDuckGo": {
+      "main": [[{ "node": "Extract & format results", "type": "main", "index": 0 }]]
+    },
+    "Extract & format results": {
+      "main": [[{ "node": "Send result to Django cache", "type": "main", "index": 0 }]]
+    },
+    "Send result to Django cache": {
+      "main": [[{ "node": "Respond to NOVAA", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "tags": ["campuseye", "novaa", "research"],
+  "triggerCount": 1,
+  "updatedAt": "2026-05-30T00:00:00.000Z",
+  "versionId": "1"
+}

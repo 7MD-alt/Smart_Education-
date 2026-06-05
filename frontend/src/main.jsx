@@ -33,6 +33,7 @@ import StudentChatPage from "./pages/student/StudentChatPage";
 import StudentAttendancePage from "./pages/student/StudentAttendancePage";
 import StudentCourseMaterialsPage from "./pages/student/StudentCourseMaterialsPage";
 import StudentSeancesPage from "./pages/student/StudentSeancesPage";
+import NOVAAPage from "./pages/student/NOVAAPage";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
@@ -72,6 +73,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
             <Route path="/student/courses/:courseId/materials" element={<ProtectedRoute role="STUDENT"><StudentCourseMaterialsPage /></ProtectedRoute>} />
             <Route path="/student/courses/:courseId/chat" element={<ProtectedRoute role="STUDENT"><StudentChatPage /></ProtectedRoute>} />
             <Route path="/student/seances" element={<ProtectedRoute role="STUDENT"><StudentSeancesPage /></ProtectedRoute>} />
+            <Route path="/student/novaa"   element={<ProtectedRoute role="STUDENT"><NOVAAPage /></ProtectedRoute>} />
           </Routes>
         </BrowserRouter>
       </ToastProvider>

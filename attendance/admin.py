@@ -13,6 +13,7 @@ from .models import (
     AttendanceRecord,
     ChatSession,
     ChatMessage,
+    StudentMemory,
 )
 
 
@@ -41,6 +42,13 @@ class StudentProfileAdmin(admin.ModelAdmin):
     list_display = ("student_id", "user", "filiere", "semester")
     list_filter = ("filiere", "semester")
     search_fields = ("student_id", "user__username", "user__email", "filiere__name")
+
+
+@admin.register(StudentMemory)
+class StudentMemoryAdmin(admin.ModelAdmin):
+    list_display = ("student", "category", "fact", "mentions", "confidence", "updated_at")
+    list_filter = ("category",)
+    search_fields = ("student__student_id", "fact", "key")
 
 
 @admin.register(Department)

@@ -7,7 +7,7 @@ import {
   Calendar, Clock, Users, Play, CheckCircle2, XCircle,
   Plus, ChevronLeft, BookOpen, Loader2, AlertTriangle,
   Download, ClipboardList, Trash2, FlaskConical, GraduationCap,
-  ArrowRight, Pencil,
+  ArrowRight, Pencil, Video, Copy, Check, Mail, KeyRound,
 } from "lucide-react";
 
 // ── Status config ─────────────────────────────────────────────────────────────
@@ -69,6 +69,13 @@ const SeanceRow = ({ seance, onStart, onEnd, onDelete, onEdit, starting, ending 
             <Pill color="#fb923c" bg="rgba(194,65,12,0.12)" label={GROUP_LABELS[seance.tp_group]} />
           )}
           <Pill {...sc} icon={ScIcon} />
+          {seance.check_in_code && seance.status !== "COMPLETED" && (
+            <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold tracking-[0.15em]"
+                  style={{ background: "rgba(34,211,238,0.12)", border: "1px solid rgba(34,211,238,0.3)", color: "#22d3ee" }}
+                  title="Code de présence (à dicter en classe)">
+              <KeyRound className="h-3 w-3" /> {seance.check_in_code}
+            </span>
+          )}
         </div>
 
         {/* Stats */}
@@ -168,27 +175,53 @@ const CreateSeanceModal = ({ courseId, onClose, onCreated }) => {
     session_type: "COURS",
     tp_group: "NONE",
     notes: "",
+    check_in_code: "",   // optional — backend auto-generates if left empty
+    is_online: false,
   });
   const [saving, setSaving] = useState(false);
+  const [result, setResult] = useState(null);   // { meet_url, invited } after an online séance
+  const [copied, setCopied] = useState(false);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(result.meet_url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch { /* clipboard blocked — ignore */ }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
     try {
-      const payload = { ...form };
-      // Map UI tp_group to API: if both groups → "BOTH"
-      await axiosClient.post(`teacher/courses/${courseId}/seances/`, payload);
-      toast.success("Séance(s) créée(s) avec succès !");
-      onCreated();
-      onClose();
+      if (form.is_online) {
+        // Online séance → dedicated endpoint creates the séance, the Jitsi meet,
+        // and emails every enrolled student + the teacher via the n8n workflow.
+        const res = await axiosClient.post("teacher/seances/online/", {
+          course_id:        courseId,
+          date:             form.date,
+          start_time:       form.start_time,
+          duration_minutes: form.duration_minutes,
+        });
+        toast.success(`Séance en ligne créée — ${res.data.invited} invitation(s) envoyée(s).`);
+        onCreated();                              // refresh the list behind the modal
+        setResult(res.data);                      // show the meet link panel (don't close yet)
+      } else {
+        await axiosClient.post(`teacher/courses/${courseId}/seances/`, { ...form });
+        toast.success("Séance(s) créée(s) avec succès !");
+        onCreated();
+        onClose();
+      }
     } catch (err) {
       toast.error(err?.response?.data?.error || "Erreur lors de la création.");
     } finally {
       setSaving(false);
     }
   };
+
+  const accent = form.is_online ? "#a78bfa" : "#22d3ee";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -198,13 +231,75 @@ const CreateSeanceModal = ({ courseId, onClose, onCreated }) => {
            style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
 
         <div className="absolute inset-x-0 top-0 h-0.5 rounded-t-full"
-             style={{ background: "linear-gradient(90deg,transparent,#22d3ee,transparent)" }} />
+             style={{ background: `linear-gradient(90deg,transparent,${accent},transparent)` }} />
 
+        {/* ── SUCCESS PANEL (online séance created) ─────────────────────────── */}
+        {result ? (
+          <div className="flex flex-col items-center gap-4 py-4 text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full"
+                 style={{ background: "rgba(124,58,237,0.15)", border: "2px solid #a78bfa", boxShadow: "0 0 24px rgba(124,58,237,0.3)" }}>
+              <Video className="h-8 w-8" style={{ color: "#a78bfa" }} />
+            </div>
+            <div>
+              <p className="text-base font-bold" style={{ color: "#a78bfa" }}>Séance en ligne créée</p>
+              <p className="text-xs mt-1 flex items-center justify-center gap-1.5" style={{ color: "var(--text-3)" }}>
+                <Mail className="h-3.5 w-3.5" /> {result.invited} invitation(s) envoyée(s) par email
+              </p>
+            </div>
+
+            {/* Meet link + copy */}
+            <div className="w-full">
+              <label className="label mb-1.5 block text-left">Lien de la réunion</label>
+              <div className="flex items-center gap-2 rounded-[var(--radius)] px-3 py-2"
+                   style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
+                <span className="flex-1 truncate text-xs font-mono" style={{ color: "#22d3ee" }}>{result.meet_url}</span>
+                <button type="button" onClick={copyLink}
+                        className="shrink-0 flex items-center gap-1 rounded px-2 py-1 text-[11px] font-semibold transition-all"
+                        style={{ background: copied ? "rgba(21,128,61,0.15)" : "rgba(124,58,237,0.12)", color: copied ? "#4ade80" : "#a78bfa", border: `1px solid ${copied ? "#4ade80" : "rgba(124,58,237,0.3)"}` }}>
+                  {copied ? <><Check className="h-3 w-3" /> Copié</> : <><Copy className="h-3 w-3" /> Copier</>}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex gap-3 w-full pt-1">
+              <a href={result.meet_url} target="_blank" rel="noreferrer" className="flex-1">
+                <button type="button" className="btn-violet w-full py-2 gap-2">
+                  <Video className="h-4 w-4" /> Rejoindre
+                </button>
+              </a>
+              <button type="button" onClick={onClose} className="btn-ghost flex-1 py-2">Fermer</button>
+            </div>
+          </div>
+        ) : (
+        <>
         <h2 className="text-base font-bold mb-5" style={{ color: "var(--text-1)" }}>
           Nouvelle séance
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+
+          {/* ── Online toggle ──────────────────────────────────────────────── */}
+          <button type="button" onClick={() => set("is_online", !form.is_online)}
+                  className="w-full flex items-center gap-3 rounded-[var(--radius-lg)] p-3 transition-all text-left"
+                  style={{
+                    background: form.is_online ? "rgba(124,58,237,0.12)" : "var(--bg)",
+                    border: `1px solid ${form.is_online ? "rgba(124,58,237,0.4)" : "var(--border)"}`,
+                  }}>
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius)]"
+                 style={{ background: form.is_online ? "rgba(124,58,237,0.2)" : "var(--surface)", border: `1px solid ${form.is_online ? "rgba(124,58,237,0.35)" : "var(--border)"}` }}>
+              <Video className="h-4 w-4" style={{ color: form.is_online ? "#a78bfa" : "var(--text-3)" }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold" style={{ color: form.is_online ? "#a78bfa" : "var(--text-1)" }}>Séance en ligne</p>
+              <p className="text-[11px]" style={{ color: "var(--text-3)" }}>Crée un lien Jitsi et l'envoie aux étudiants par email</p>
+            </div>
+            {/* Switch */}
+            <div className="shrink-0 h-5 w-9 rounded-full p-0.5 transition-all"
+                 style={{ background: form.is_online ? "#7c3aed" : "var(--border)" }}>
+              <div className="h-4 w-4 rounded-full bg-white transition-all"
+                   style={{ transform: form.is_online ? "translateX(16px)" : "translateX(0)" }} />
+            </div>
+          </button>
 
           {/* Date */}
           <div>
@@ -229,9 +324,9 @@ const CreateSeanceModal = ({ courseId, onClose, onCreated }) => {
                         onClick={() => set("duration_minutes", d)}
                         className="px-3 py-1.5 rounded-[var(--radius)] text-xs font-semibold transition-all"
                         style={{
-                          background: form.duration_minutes === d ? "rgba(34,211,238,0.2)" : "var(--bg)",
-                          border: `1px solid ${form.duration_minutes === d ? "#22d3ee" : "var(--border)"}`,
-                          color: form.duration_minutes === d ? "#22d3ee" : "var(--text-2)",
+                          background: form.duration_minutes === d ? `${accent}33` : "var(--bg)",
+                          border: `1px solid ${form.duration_minutes === d ? accent : "var(--border)"}`,
+                          color: form.duration_minutes === d ? accent : "var(--text-2)",
                         }}>
                   {d} min
                 </button>
@@ -239,70 +334,98 @@ const CreateSeanceModal = ({ courseId, onClose, onCreated }) => {
             </div>
           </div>
 
-          {/* Type */}
-          <div>
-            <label className="label mb-1.5 block">Type de séance</label>
-            <div className="flex gap-3">
-              {["COURS", "TP"].map(t => {
-                const tc = TYPE_CONFIG[t];
-                const active = form.session_type === t;
-                return (
-                  <button key={t} type="button"
-                          onClick={() => { set("session_type", t); if (t === "COURS") set("tp_group", "NONE"); else set("tp_group", "GROUP_A"); }}
-                          className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-[var(--radius-lg)] text-sm font-semibold transition-all"
-                          style={{
-                            background: active ? tc.bg : "var(--bg)",
-                            border: `1px solid ${active ? tc.color : "var(--border)"}`,
-                            color: active ? tc.color : "var(--text-3)",
-                          }}>
-                    <tc.icon className="h-4 w-4" /> {tc.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Group (only if TP) */}
-          {form.session_type === "TP" && (
-            <div>
-              <label className="label mb-1.5 block">Groupe</label>
-              <div className="flex gap-2">
-                {[
-                  { val: "GROUP_A", label: "Groupe A" },
-                  { val: "GROUP_B", label: "Groupe B" },
-                  { val: "BOTH",    label: "Les deux (2 séances)" },
-                ].map(g => {
-                  const active = form.tp_group === g.val;
-                  return (
-                    <button key={g.val} type="button"
-                            onClick={() => set("tp_group", g.val)}
-                            className="flex-1 py-2 rounded-[var(--radius)] text-xs font-semibold transition-all"
-                            style={{
-                              background: active ? "rgba(251,191,36,0.15)" : "var(--bg)",
-                              border: `1px solid ${active ? "#fbbf24" : "var(--border)"}`,
-                              color: active ? "#fbbf24" : "var(--text-3)",
-                            }}>
-                      {g.label}
-                    </button>
-                  );
-                })}
+          {/* Type + Group + Notes — only for in-person séances */}
+          {!form.is_online ? (
+            <>
+              {/* Type */}
+              <div>
+                <label className="label mb-1.5 block">Type de séance</label>
+                <div className="flex gap-3">
+                  {["COURS", "TP"].map(t => {
+                    const tc = TYPE_CONFIG[t];
+                    const active = form.session_type === t;
+                    return (
+                      <button key={t} type="button"
+                              onClick={() => { set("session_type", t); if (t === "COURS") set("tp_group", "NONE"); else set("tp_group", "GROUP_A"); }}
+                              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-[var(--radius-lg)] text-sm font-semibold transition-all"
+                              style={{
+                                background: active ? tc.bg : "var(--bg)",
+                                border: `1px solid ${active ? tc.color : "var(--border)"}`,
+                                color: active ? tc.color : "var(--text-3)",
+                              }}>
+                        <tc.icon className="h-4 w-4" /> {tc.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-              {form.tp_group === "BOTH" && (
-                <p className="text-xs mt-2" style={{ color: "var(--text-3)" }}>
-                  Deux séances consécutives seront créées : Groupe A puis Groupe B,
-                  chacune de {form.duration_minutes} min.
-                </p>
+
+              {/* Group (only if TP) */}
+              {form.session_type === "TP" && (
+                <div>
+                  <label className="label mb-1.5 block">Groupe</label>
+                  <div className="flex gap-2">
+                    {[
+                      { val: "GROUP_A", label: "Groupe A" },
+                      { val: "GROUP_B", label: "Groupe B" },
+                      { val: "BOTH",    label: "Les deux (2 séances)" },
+                    ].map(g => {
+                      const active = form.tp_group === g.val;
+                      return (
+                        <button key={g.val} type="button"
+                                onClick={() => set("tp_group", g.val)}
+                                className="flex-1 py-2 rounded-[var(--radius)] text-xs font-semibold transition-all"
+                                style={{
+                                  background: active ? "rgba(251,191,36,0.15)" : "var(--bg)",
+                                  border: `1px solid ${active ? "#fbbf24" : "var(--border)"}`,
+                                  color: active ? "#fbbf24" : "var(--text-3)",
+                                }}>
+                          {g.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {form.tp_group === "BOTH" && (
+                    <p className="text-xs mt-2" style={{ color: "var(--text-3)" }}>
+                      Deux séances consécutives seront créées : Groupe A puis Groupe B,
+                      chacune de {form.duration_minutes} min.
+                    </p>
+                  )}
+                </div>
               )}
+
+              {/* Notes */}
+              <div>
+                <label className="label mb-1.5 block">Notes <span style={{ color: "var(--text-3)" }}>(optionnel)</span></label>
+                <textarea value={form.notes} onChange={e => set("notes", e.target.value)}
+                          placeholder="Ex: Salle B12, apporter les cahiers…"
+                          rows={2} className="input w-full resize-none" />
+              </div>
+
+              {/* Check-in code */}
+              <div>
+                <label className="label mb-1.5 block">
+                  Code de présence <span style={{ color: "var(--text-3)" }}>(optionnel — auto-généré si vide)</span>
+                </label>
+                <input value={form.check_in_code}
+                       onChange={e => set("check_in_code", e.target.value.toUpperCase())}
+                       maxLength={12} placeholder="Laisser vide pour générer automatiquement"
+                       className="input w-full tracking-[0.2em] font-semibold" />
+                <p className="mt-1 text-[11px]" style={{ color: "var(--text-3)" }}>
+                  Les étudiants devront entrer ce code avant la reconnaissance faciale. Il ne leur est jamais envoyé.
+                </p>
+              </div>
+            </>
+          ) : (
+            <div className="flex items-start gap-2.5 rounded-[var(--radius)] p-3"
+                 style={{ background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.2)" }}>
+              <Mail className="h-4 w-4 shrink-0 mt-0.5" style={{ color: "#a78bfa" }} />
+              <p className="text-xs leading-relaxed" style={{ color: "var(--text-2)" }}>
+                Un lien <strong style={{ color: "#a78bfa" }}>Jitsi Meet</strong> sera généré et envoyé par email
+                à tous les étudiants inscrits ainsi qu'à vous-même, avec une invitation agenda (.ics).
+              </p>
             </div>
           )}
-
-          {/* Notes */}
-          <div>
-            <label className="label mb-1.5 block">Notes <span style={{ color: "var(--text-3)" }}>(optionnel)</span></label>
-            <textarea value={form.notes} onChange={e => set("notes", e.target.value)}
-                      placeholder="Ex: Salle B12, apporter les cahiers…"
-                      rows={2} className="input w-full resize-none" />
-          </div>
 
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose}
@@ -310,11 +433,18 @@ const CreateSeanceModal = ({ courseId, onClose, onCreated }) => {
               Annuler
             </button>
             <button type="submit" disabled={saving}
-                    className="btn-cyan flex-1 py-2 gap-2 disabled:opacity-40">
-              {saving ? <><Loader2 className="h-4 w-4 animate-spin" /> Création…</> : <><Plus className="h-4 w-4" /> Créer</>}
+                    className="flex-1 py-2 gap-2 btn disabled:opacity-40"
+                    style={{ background: `${accent}26`, border: `1px solid ${accent}`, color: accent }}>
+              {saving
+                ? <><Loader2 className="h-4 w-4 animate-spin" /> {form.is_online ? "Création & envoi…" : "Création…"}</>
+                : form.is_online
+                  ? <><Video className="h-4 w-4" /> Créer & envoyer</>
+                  : <><Plus className="h-4 w-4" /> Créer</>}
             </button>
           </div>
         </form>
+        </>
+        )}
       </div>
     </div>
   );
@@ -571,19 +701,21 @@ const SeancesPage = () => {
         {/* Header */}
         <div className="page-header fade-up">
           <div>
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="h-px flex-1 max-w-[40px]"
+                style={{ background: "linear-gradient(90deg, rgba(34,211,238,0.5), transparent)" }} />
               <Link to="/teacher/courses" className="label hover:text-cyan-400 transition-colors">
                 Mes Cours
               </Link>
-              <span className="label">/</span>
-              <span className="label" style={{ color: "var(--text-2)" }}>
-                {course?.title || "…"}
-              </span>
+              <span className="label" style={{ opacity: 0.4 }}>/</span>
+              <span className="label" style={{ color: "var(--text-2)" }}>{course?.title || "…"}</span>
             </div>
-            <h1 className="page-title">Séances</h1>
-            <p className="page-sub">Gérez les séances de présence pour ce cours.</p>
+            <h1 style={{ fontSize: "2.25rem", fontWeight: 750, letterSpacing: "-0.04em", color: "#f0f0ff", lineHeight: 1.1 }}>
+              Séances
+            </h1>
+            <p className="page-sub mt-2">Gérez les séances de présence pour ce cours.</p>
           </div>
-          <button onClick={() => setShowModal(true)} className="btn-cyan gap-1.5">
+          <button onClick={() => setShowModal(true)} className="btn-cyan gap-1.5 px-5 py-2.5">
             <Plus className="h-4 w-4" /> Nouvelle séance
           </button>
         </div>

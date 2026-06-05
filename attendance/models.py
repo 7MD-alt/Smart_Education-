@@ -259,6 +259,17 @@ class MaterialEmbedding(models.Model):
 # SEANCES
 # =========================================================
 
+def generate_seance_code(length: int = 6) -> str:
+    """
+    Generate a short, human-readable check-in code (no ambiguous chars like
+    0/O, 1/I). Students must type this code before face recognition is unlocked.
+    The code is shown only to the teacher — never pushed to students.
+    """
+    import secrets
+    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
 class Seance(models.Model):
     course = models.ForeignKey(
         Course,
@@ -285,6 +296,9 @@ class Seance(models.Model):
         default=SeanceStatus.SCHEDULED,
     )
     notes = models.TextField(blank=True, default="")
+    # Check-in code: students must enter this before face recognition unlocks.
+    # Empty string = no code required (legacy séances). Never exposed to students.
+    check_in_code = models.CharField(max_length=12, blank=True, default="")
     created_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -390,6 +404,43 @@ class ChatMessage(models.Model):
         return f"{self.sender_role} - session {self.session_id}"
 
 
+class MemoryCategory(models.TextChoices):
+    LEVEL      = "LEVEL",      "Academic level"
+    STRUGGLE   = "STRUGGLE",   "Struggle / weak topic"
+    GOAL       = "GOAL",       "Goal / ambition"
+    PREFERENCE = "PREFERENCE", "Preference"
+    INTEREST   = "INTEREST",   "Interest"
+    OTHER      = "OTHER",      "Other"
+
+
+class StudentMemory(models.Model):
+    """
+    Per-student facts NOVAA learns from chat over time (level, struggles, goals,
+    preferences). Injected into the tutor's system prompt so answers stay
+    personalised across sessions. Lightweight, pattern-extracted — no embeddings.
+    """
+    student = models.ForeignKey(
+        StudentProfile,
+        on_delete=models.CASCADE,
+        related_name="memories",
+    )
+    category   = models.CharField(max_length=20, choices=MemoryCategory.choices,
+                                  default=MemoryCategory.OTHER)
+    fact       = models.CharField(max_length=200)
+    key        = models.CharField(max_length=120, db_index=True)  # normalised dedupe key
+    confidence = models.FloatField(default=0.6)
+    mentions   = models.PositiveIntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("student", "key")
+        ordering = ["-mentions", "-updated_at"]
+
+    def __str__(self):
+        return f"{self.student.student_id}: {self.fact}"
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Notifications
 # ─────────────────────────────────────────────────────────────────────────────
@@ -426,16 +477,49 @@ class FaceRegistrationRequest(models.Model):
         return f"FaceRequest[{self.status}] {self.student.student_id}"
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Assignments
+# ─────────────────────────────────────────────────────────────────────────────
+
+class AssignmentStatus(models.TextChoices):
+    OPEN   = "OPEN",   "Open"
+    CLOSED = "CLOSED", "Closed"
+
+
+class Assignment(models.Model):
+    course       = models.ForeignKey(
+        Course, on_delete=models.CASCADE, related_name="assignments"
+    )
+    created_by   = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, related_name="created_assignments"
+    )
+    title        = models.CharField(max_length=300)
+    instructions = models.TextField(blank=True, default="")
+    due_date     = models.DateField(null=True, blank=True)
+    status       = models.CharField(
+        max_length=10, choices=AssignmentStatus.choices, default=AssignmentStatus.OPEN
+    )
+    created_by_novaa = models.BooleanField(default=False)
+    created_at   = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.title} — {self.course.title}"
+
+
 class NotificationType(models.TextChoices):
-    ABSENCE_INFO    = "ABSENCE_INFO",    "First absence recorded"
-    ABSENCE_WARNING = "ABSENCE_WARNING", "Approaching absence limit"
-    ABSENCE_DANGER  = "ABSENCE_DANGER",  "Absence limit reached"
-    MATERIAL_ADDED  = "MATERIAL_ADDED",  "New course material uploaded"
-    STUDENT_JOINED  = "STUDENT_JOINED",  "Student enrolled in your course"
-    COURSE_ASSIGNED = "COURSE_ASSIGNED", "You were assigned to a new course"
-    FACE_REQUEST    = "FACE_REQUEST",    "Face registration request update"
-    SEANCE_CREATED  = "SEANCE_CREATED",  "New séance scheduled"
-    SEANCE_STARTED  = "SEANCE_STARTED",  "Séance has started — mark your attendance"
+    ABSENCE_INFO       = "ABSENCE_INFO",       "First absence recorded"
+    ABSENCE_WARNING    = "ABSENCE_WARNING",     "Approaching absence limit"
+    ABSENCE_DANGER     = "ABSENCE_DANGER",      "Absence limit reached"
+    MATERIAL_ADDED     = "MATERIAL_ADDED",      "New course material uploaded"
+    STUDENT_JOINED     = "STUDENT_JOINED",      "Student enrolled in your course"
+    COURSE_ASSIGNED    = "COURSE_ASSIGNED",     "You were assigned to a new course"
+    FACE_REQUEST       = "FACE_REQUEST",        "Face registration request update"
+    SEANCE_CREATED     = "SEANCE_CREATED",      "New séance scheduled"
+    SEANCE_STARTED     = "SEANCE_STARTED",      "Séance has started — mark your attendance"
+    ASSIGNMENT_CREATED = "ASSIGNMENT_CREATED",  "New assignment posted"
 
 
 class Notification(models.Model):

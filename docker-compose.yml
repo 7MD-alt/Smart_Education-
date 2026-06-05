@@ -1,0 +1,93 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CampusEye + n8n  —  docker-compose
+#
+# Services:
+#   db      — PostgreSQL (same DB your Django app uses)
+#   django  — Django backend (port 8000)
+#   n8n     — Workflow automation (port 5678)
+#
+# Usage:
+#   docker-compose up -d          # start everything
+#   docker-compose logs -f n8n    # tail n8n logs
+#   docker-compose down           # stop everything
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       est_attendance_db
+      POSTGRES_USER:     postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Django backend ──────────────────────────────────────────────────────────
+  django:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env                        # your existing env file (never committed)
+    environment:
+      - DATABASE_URL=postgresql://postgres:${DB_PASSWORD:-postgres}@db:5432/est_attendance_db
+      - USE_POSTGRES=true
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - media_data:/app/media
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py runserver 0.0.0.0:8000"
+
+  # ── n8n workflow automation ─────────────────────────────────────────────────
+  n8n:
+    image: n8nio/n8n:latest
+    restart: unless-stopped
+    depends_on:
+      - django
+    ports:
+      - "5678:5678"
+    environment:
+      # Basic auth to protect n8n UI (change these!)
+      N8N_BASIC_AUTH_ACTIVE:   "true"
+      N8N_BASIC_AUTH_USER:     ${N8N_USER:-admin}
+      N8N_BASIC_AUTH_PASSWORD: ${N8N_PASSWORD:-campuseye2024}
+
+      # n8n instance URL (used in email links etc.)
+      N8N_HOST:     localhost
+      N8N_PORT:     5678
+      N8N_PROTOCOL: http
+      WEBHOOK_URL:  http://localhost:5678/
+
+      # Timezone for cron schedules
+      GENERIC_TIMEZONE: Africa/Casablanca
+
+      # Django endpoint n8n will call
+      CAMPUSEYE_API_URL:   http://django:8000/api
+      CAMPUSEYE_N8N_TOKEN: ${N8N_SECRET_TOKEN:-changeme-use-a-long-random-string}
+
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+volumes:
+  pg_data:
+  media_data:
+  n8n_data:

@@ -1,0 +1,213 @@
+{
+  "name": "CampusEye — Manual Danger Zone Alerts",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "campuseye-danger-alerts",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Triggered by DangerZone button",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "campuseye-danger-alerts"
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.CAMPUSEYE_API_URL }}/n8n/danger-alerts/{{ $json.body.course_id ? '?course_id=' + $json.body.course_id : '' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "fetch-alerts",
+      "name": "Fetch danger zone students",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "campuseye-n8n-token",
+          "name": "CampusEye N8N Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-alerts",
+              "leftValue": "={{ $json.total }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-has-alerts",
+      "name": "Any students at risk?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "alerts",
+        "options": {}
+      },
+      "id": "split-alerts",
+      "name": "Split into individual alerts",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true
+          },
+          "conditions": [
+            {
+              "id": "has-email",
+              "leftValue": "={{ $json.student_email }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-has-email",
+      "name": "Student has email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $env.CAMPUSEYE_FROM_EMAIL }}",
+        "toEmail": "={{ $json.student_email }}",
+        "subject": "={{ $json.status === 'DANGER' ? '[CampusEye] ⚠️ DANGER — Absence limit reached in ' + $json.course_title : '[CampusEye] ⚠️ Warning — Approaching absence limit in ' + $json.course_title }}",
+        "emailType": "text",
+        "message": "={{ \n  $json.status === 'DANGER'\n  ? 'Dear ' + $json.student_name + ',\\n\\nYou have reached or exceeded the maximum number of absences allowed in the course \"' + $json.course_title + '\".\\n\\n  Absences recorded : ' + $json.absences + '\\n  Maximum allowed   : ' + $json.max_absences + '\\n\\nYour situation requires immediate administrative action. Please contact your teacher (' + $json.teacher_name + ') or the academic office as soon as possible.\\n\\nReview your attendance:\\nhttp://localhost:5173/student\\n\\n— CampusEye Academic Platform'\n  : 'Dear ' + $json.student_name + ',\\n\\nThis is a friendly reminder that you are approaching the absence limit in \"' + $json.course_title + '\".\\n\\n  Absences recorded : ' + $json.absences + '\\n  Maximum allowed   : ' + $json.max_absences + '\\n  Remaining         : ' + $json.remaining + ' absence(s)\\n\\nPlease attend upcoming sessions to avoid exceeding the limit.\\n\\nReview your attendance:\\nhttp://localhost:5173/student\\n\\n— CampusEye Academic Platform'\n}}",
+        "options": {}
+      },
+      "id": "send-email",
+      "name": "Send alert email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1340, 160],
+      "credentials": {
+        "smtp": {
+          "id": "campuseye-smtp",
+          "name": "CampusEye SMTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.CAMPUSEYE_API_URL }}/n8n/mark-alerted/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "student_id", "value": "={{ $('Split into individual alerts').item.json.student_id }}" },
+            { "name": "course_id",  "value": "={{ $('Split into individual alerts').item.json.course_id }}" },
+            { "name": "status",     "value": "={{ $('Split into individual alerts').item.json.status }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "mark-alerted",
+      "name": "Mark as alerted in CampusEye",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1560, 160],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "campuseye-n8n-token",
+          "name": "CampusEye N8N Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "no-email-log",
+      "name": "No email — skip",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1340, 340]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "no-alerts",
+      "name": "No alerts today",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [900, 420]
+    }
+  ],
+  "connections": {
+    "Triggered by DangerZone button": {
+      "main": [[{ "node": "Fetch danger zone students", "type": "main", "index": 0 }]]
+    },
+    "Fetch danger zone students": {
+      "main": [[{ "node": "Any students at risk?", "type": "main", "index": 0 }]]
+    },
+    "Any students at risk?": {
+      "main": [
+        [{ "node": "Split into individual alerts", "type": "main", "index": 0 }],
+        [{ "node": "No alerts today",              "type": "main", "index": 0 }]
+      ]
+    },
+    "Split into individual alerts": {
+      "main": [[{ "node": "Student has email?", "type": "main", "index": 0 }]]
+    },
+    "Student has email?": {
+      "main": [
+        [{ "node": "Send alert email", "type": "main", "index": 0 }],
+        [{ "node": "No email — skip",  "type": "main", "index": 0 }]
+      ]
+    },
+    "Send alert email": {
+      "main": [[{ "node": "Mark as alerted in CampusEye", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": ["campuseye", "attendance", "alerts"],
+  "triggerCount": 1,
+  "updatedAt": "2026-05-28T00:00:00.000Z",
+  "versionId": "1"
+}

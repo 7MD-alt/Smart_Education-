@@ -6,26 +6,36 @@ import axiosClient from "../../api/axiosClient";
 
 /* ── Route label map ─────────────────────────────────────────── */
 const ROUTE_LABELS = {
+  /* Admin */
   "/admin":             "Dashboard",
   "/admin/users":       "Users",
   "/admin/departments": "Departments",
   "/admin/filieres":    "Filieres",
   "/admin/courses":     "Courses",
+  "/admin/face-requests": "Face Requests",
   "/admin/profile":     "Profile",
+  /* Teacher */
   "/teacher":           "Dashboard",
+  "/teacher/courses":   "My Courses",
   "/teacher/scan":      "Live Scan",
   "/teacher/profile":   "Profile",
+  /* Student */
   "/student":           "Dashboard",
   "/student/attendance":"Attendance",
+  "/student/seances":   "My Séances",
+  "/student/novaa":     "NOVAA",
   "/student/chat":      "AI Tutor",
   "/student/profile":   "Profile",
 };
 
 function getPageLabel(pathname) {
   if (ROUTE_LABELS[pathname]) return ROUTE_LABELS[pathname];
-  if (pathname.includes("/attendance"))  return "Attendance";
-  if (pathname.includes("/materials"))   return "Course Materials";
+  /* Dynamic segments — order matters: most specific first */
+  if (pathname.includes("/roster"))      return "Attendance Roster";
   if (pathname.includes("/danger-zone")) return "Danger Zone";
+  if (pathname.includes("/materials"))   return "Course Materials";
+  if (pathname.includes("/attendance"))  return "Attendance";
+  if (pathname.includes("/seances"))     return "Séances";
   if (pathname.includes("/chat"))        return "AI Tutor";
   return "CampusEye";
 }
@@ -343,10 +353,10 @@ const Navbar = ({ variant = "dashboard", onMenuClick }) => {
     <header
       className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between px-5 md:px-6"
       style={{
-        background: "rgba(7,7,13,0.85)",
-        backdropFilter: "blur(12px)",
+        background: "rgba(3,3,18,0.88)",
+        backdropFilter: "blur(16px)",
         borderBottom: "1px solid var(--border)",
-        boxShadow: "0 1px 0 rgba(255,255,255,0.03)",
+        boxShadow: "0 1px 0 rgba(139,92,246,0.08), 0 4px 20px rgba(0,0,0,0.2)",
       }}
     >
       {/* Left — breadcrumb */}

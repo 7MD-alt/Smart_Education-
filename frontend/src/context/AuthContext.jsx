@@ -70,6 +70,43 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  // ── Cross-tab auth sync ───────────────────────────────────────
+  // localStorage is shared across all tabs of the same origin. If you log in
+  // as a different role in another tab, that tab overwrites the token — which
+  // would otherwise leave THIS tab showing a stale page making forbidden calls.
+  // The `storage` event fires only in OTHER tabs, so we react to it here.
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (e.key !== "access_token") return;
+      if (!e.newValue) {
+        // Logged out in another tab → drop our session too.
+        setUser(null);
+        setProfile(null);
+      } else if (e.newValue !== e.oldValue) {
+        // A different account logged in elsewhere → re-sync identity so that
+        // ProtectedRoute redirects this tab to the correct role home.
+        fetchCurrentUser();
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Role-mismatch 403 handler ─────────────────────────────────
+  // axiosClient dispatches `auth:forbidden` for permission-denied 403s that are
+  // NOT business-rule rejections (those carry a `reason`). When the token's role
+  // no longer matches the current route, re-validate identity — ProtectedRoute
+  // then redirects to the right place instead of silently showing stale data.
+  useEffect(() => {
+    const onForbidden = () => {
+      if (localStorage.getItem("access_token")) fetchCurrentUser();
+    };
+    window.addEventListener("auth:forbidden", onForbidden);
+    return () => window.removeEventListener("auth:forbidden", onForbidden);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{

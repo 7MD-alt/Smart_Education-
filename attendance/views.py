@@ -7,9 +7,11 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.parsers import MultiPartParser, FormParser
 import os
 import io
+import re
+import json
 import logging
 import requests as http_requests
-from django.http import HttpResponse
+from django.http import HttpResponse, StreamingHttpResponse
 from django.core.mail import send_mail
 from django.utils import timezone
 from django.conf import settings as django_settings
@@ -58,6 +60,7 @@ from .models import (
     SeanceStatus,
     SessionType,
     TPGroup,
+    generate_seance_code,
 )
 from datetime import date, datetime, timedelta
 
@@ -87,6 +90,9 @@ from .permissions import (
 from .services.face_recognition_service import recognize_and_mark_attendance
 from .services.multi_agent_service import ask_tutor
 from .services.face_registration_service import register_student_face
+# campuseye_agent_service is imported lazily inside AgentExecuteAPIView to avoid circular imports
+from .services.novaa_tutor_service import ask_novaa, ask_novaa_stream
+from .services.platform_executor import get_platform_context, get_email_context_for_student
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -839,6 +845,8 @@ class AdminImportUsersAPIView(APIView):
         created = 0
         skipped = 0
         errors  = []
+        base_student_count   = StudentProfile.objects.count()
+        students_in_import   = 0
 
         for row_num, row in enumerate(reader, start=2):   # row 1 = header
             row = {k.strip().lower(): (v or "").strip() for k, v in row.items()}
@@ -893,13 +901,15 @@ class AdminImportUsersAPIView(APIView):
                             except (Filiere.DoesNotExist, ValueError):
                                 pass
                         semester = int(row.get("semester") or 1)
+                        auto_sid = str(base_student_count + students_in_import + 1)
                         StudentProfile.objects.create(
                             user=user,
-                            student_id=row.get("student_id") or username,
+                            student_id=row.get("student_id") or auto_sid,
                             massar_code=massar_code,
                             filiere=filiere,
                             semester=semester,
                         )
+                        students_in_import += 1
 
                     elif role == "TEACHER":
                         dept = None
@@ -1240,7 +1250,7 @@ class StudentSelfRegisterFaceAPIView(APIView):
             "success": True,
             "request_id": face_req.id,
             "message": "Your request has been submitted and is pending admin review.",
-        }, status=status.HTTP_201_CREATED)
+        }, status=status.HTTP_200_OK)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1399,7 +1409,14 @@ class MeCoursesAPIView(APIView):
                 filiere_courses__semester=student_profile.semester
             ).select_related("teacher", "teacher__user").distinct()
 
-            return Response(CourseSerializer(courses, many=True).data)
+            # Annotate each course with material_count so the NOVAA
+            # chat widget knows which courses have RAG-able content
+            data = []
+            for c in courses:
+                serialized = CourseSerializer(c).data
+                serialized["material_count"] = CourseMaterial.objects.filter(course=c).count()
+                data.append(serialized)
+            return Response(data)
 
         if user.role == "ADMIN":
             courses = Course.objects.select_related("teacher", "teacher__user").all()
@@ -1905,7 +1922,7 @@ class CourseAttendanceSummaryAPIView(APIView):
             absent  = sum(1 for r in recs if r.status == "ABSENT")
             late    = sum(1 for r in recs if r.status == "LATE")
             total   = present + absent + late
-            d       = _seance_to_dict(s)
+            d       = _seance_to_dict(s, include_code=True)
             d.update({
                 "present_count": present,
                 "absent_count":  absent,
@@ -2096,11 +2113,67 @@ Answer questions about CampusEye clearly and briefly. If the user asks something
 
 
 # =============================================================================
+# NOVAA AGENT EXECUTE ENDPOINT
+# =============================================================================
+
+class AgentExecuteAPIView(APIView):
+    """
+    POST /api/agent/execute/
+    ────────────────────────
+    Called by NOVAA (or any external AI) to execute CampusEye tasks via
+    natural language. Supports a two-phase flow:
+
+    Phase 1 — Natural language instruction:
+      Body: { "instruction": "Create a student named Ahmed...", "params": {} }
+      Response: { "status": "needs_info", "questions": [...] }
+                 OR { "status": "executed", "result": {...} }
+
+    Phase 2 — NOVAA supplies the missing parameters:
+      Body: { "instruction": "...", "params": { "_tool": "create_user", "first_name": "Ahmed", ... } }
+      Response: { "status": "executed", "result": {...} }
+
+    The endpoint is accessible to ADMIN and TEACHER roles only.
+    NOVAA must authenticate with a valid JWT token for the acting user.
+    """
+    permission_classes = [IsAuthenticated, IsAdminOrTeacher]
+
+    def post(self, request):
+        from .services.campuseye_agent_service import process_agent_request
+
+        instruction = (request.data.get("instruction") or "").strip()
+        params      = request.data.get("params") or {}
+
+        if not instruction and not params.get("_tool"):
+            return Response(
+                {"status": "error", "message": "Provide an 'instruction' or a '_tool' in params."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        role   = request.user.role
+        result = process_agent_request(
+            instruction      = instruction,
+            role             = role,
+            params_override  = dict(params),   # copy so we don't mutate request.data
+            requesting_user  = request.user,
+        )
+
+        http_status = status.HTTP_200_OK
+        if result.get("status") == "error":
+            http_status = status.HTTP_400_BAD_REQUEST
+
+        return Response(result, status=http_status)
+
+
+# =============================================================================
 # SÉANCE SYSTEM
 # =============================================================================
 
-def _seance_to_dict(seance, include_stats=False):
-    """Serialize a Seance instance to a plain dict."""
+def _seance_to_dict(seance, include_stats=False, include_code=False):
+    """
+    Serialize a Seance to a plain dict.
+    include_code: ONLY pass True for teacher/admin-facing responses — the
+    check-in code must never reach students.
+    """
     d = {
         "id":               seance.id,
         "course_id":        seance.course_id,
@@ -2113,7 +2186,11 @@ def _seance_to_dict(seance, include_stats=False):
         "status":           seance.status,
         "notes":            seance.notes,
         "created_at":       seance.created_at.isoformat(),
+        # Safe for everyone: whether a code is needed (NOT the code itself).
+        "requires_code":    bool(seance.check_in_code),
     }
+    if include_code:
+        d["check_in_code"]      = seance.check_in_code
     if include_stats:
         records = seance.attendance_records.all()
         d["present_count"] = records.filter(status="PRESENT").count()
@@ -2134,6 +2211,52 @@ def _get_seance_eligible_students(seance):
     if seance.session_type == SessionType.TP and seance.tp_group != TPGroup.NONE:
         qs = qs.filter(tp_group=seance.tp_group)
     return qs.order_by("user__last_name", "user__first_name")
+
+
+def _auto_activate_scheduled_seance(seance):
+    """If a SCHEDULED seance is within 5 minutes of its start time, activate it."""
+    if seance.status != SeanceStatus.SCHEDULED:
+        return False
+    now = datetime.now()
+    seance_start = datetime.combine(seance.date, seance.start_time)
+    if now >= seance_start - timedelta(minutes=5):
+        seance.status = SeanceStatus.ACTIVE
+        seance.save(update_fields=["status"])
+        return True
+    return False
+
+
+def _auto_complete_expired_seance(seance):
+    """
+    If the seance is ACTIVE and its end time has passed, mark it COMPLETED
+    and auto-create ABSENT records for students who never checked in.
+    Returns True if the seance was completed by this call.
+    """
+    if seance.status != SeanceStatus.ACTIVE:
+        return False
+    now = datetime.now()
+    seance_end = datetime.combine(seance.date, seance.start_time) + timedelta(minutes=seance.duration_minutes)
+    if now < seance_end:
+        return False
+
+    seance.status = SeanceStatus.COMPLETED
+    seance.save(update_fields=["status"])
+
+    eligible   = _get_seance_eligible_students(seance)
+    already_in = set(AttendanceRecord.objects.filter(seance=seance).values_list("student_id", flat=True))
+    for student in eligible:
+        if student.pk not in already_in:
+            absences_before = _get_student_absence_count(student, seance.course)
+            AttendanceRecord.objects.create(
+                course=seance.course,
+                student=student,
+                seance=seance,
+                date=seance.date,
+                status="ABSENT",
+            )
+            absences_after = _get_student_absence_count(student, seance.course)
+            _handle_absence_thresholds(student, seance.course, absences_before, absences_after)
+    return True
 
 
 class SeanceListCreateAPIView(APIView):
@@ -2157,12 +2280,15 @@ class SeanceListCreateAPIView(APIView):
         if err:
             return err
 
-        seances = Seance.objects.filter(course=course).prefetch_related("attendance_records")
+        seances = list(Seance.objects.filter(course=course).prefetch_related("attendance_records").select_related("course"))
+        for s in seances:
+            _auto_activate_scheduled_seance(s)
+            _auto_complete_expired_seance(s)
         status_filter = request.query_params.get("status")
         if status_filter:
-            seances = seances.filter(status=status_filter.upper())
+            seances = [s for s in seances if s.status == status_filter.upper()]
 
-        return Response([_seance_to_dict(s, include_stats=True) for s in seances])
+        return Response([_seance_to_dict(s, include_stats=True, include_code=True) for s in seances])
 
     def post(self, request, course_id):
         course, err = self._get_course(request, course_id)
@@ -2176,6 +2302,9 @@ class SeanceListCreateAPIView(APIView):
         session_type    = data.get("session_type", SessionType.COURS)
         tp_group_val    = data.get("tp_group", TPGroup.NONE)
         notes           = data.get("notes", "")
+        # Check-in code: teacher may supply one, else auto-generate. Required for
+        # the student to unlock face recognition; never sent to students.
+        check_in_code   = (data.get("check_in_code") or "").strip().upper() or generate_seance_code()
 
         if not date_str or not start_time_str:
             return Response({"error": "date and start_time are required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -2202,6 +2331,7 @@ class SeanceListCreateAPIView(APIView):
                     session_type=SessionType.TP,
                     tp_group=grp,
                     notes=notes,
+                    check_in_code=check_in_code,
                     created_by=request.user,
                 )
                 created_seances.append(s)
@@ -2220,9 +2350,18 @@ class SeanceListCreateAPIView(APIView):
                 session_type=session_type,
                 tp_group=tp_group_val if session_type == SessionType.TP else TPGroup.NONE,
                 notes=notes,
+                check_in_code=check_in_code,
                 created_by=request.user,
             )
             created_seances.append(s)
+
+        # Auto-activate seances scheduled to start within the next 5 minutes
+        now = datetime.now()
+        for s in created_seances:
+            seance_start = datetime.combine(s.date, s.start_time)
+            if now >= seance_start - timedelta(minutes=5):
+                s.status = SeanceStatus.ACTIVE
+                s.save(update_fields=["status"])
 
         # Notify eligible students for each created séance
         for s in created_seances:
@@ -2240,7 +2379,7 @@ class SeanceListCreateAPIView(APIView):
                 )
 
         return Response(
-            [_seance_to_dict(s) for s in created_seances],
+            [_seance_to_dict(s, include_code=True) for s in created_seances],
             status=status.HTTP_201_CREATED,
         )
 
@@ -2258,7 +2397,7 @@ class SeanceDetailAPIView(APIView):
             s = Seance.objects.select_related("course__teacher").get(pk=seance_id)
         except Seance.DoesNotExist:
             return None, Response({"error": "Séance not found."}, status=status.HTTP_404_NOT_FOUND)
-        if s.course.teacher_id != request.user.pk:
+        if int(s.course.teacher_id) != int(request.user.pk) and getattr(request.user, "role", None) != "ADMIN":
             return None, Response({"error": "Forbidden."}, status=status.HTTP_403_FORBIDDEN)
         return s, None
 
@@ -2285,7 +2424,9 @@ class SeanceDetailAPIView(APIView):
         seance, err = self._get_seance(request, seance_id)
         if err:
             return err
-        data = _seance_to_dict(seance, include_stats=True)
+        _auto_activate_scheduled_seance(seance)
+        _auto_complete_expired_seance(seance)
+        data = _seance_to_dict(seance, include_stats=True, include_code=True)
         data["roster"] = self._build_roster(seance)
         return Response(data)
 
@@ -2304,7 +2445,7 @@ class SeanceDetailAPIView(APIView):
         # Refresh so time/date fields are proper Python objects (not raw strings)
         # before _seance_to_dict calls .strftime() on them
         seance.refresh_from_db()
-        return Response(_seance_to_dict(seance))
+        return Response(_seance_to_dict(seance, include_code=True))
 
     def delete(self, request, seance_id):
         seance, err = self._get_seance(request, seance_id)
@@ -2333,7 +2474,7 @@ class SeanceStartAPIView(APIView):
         seance.status = SeanceStatus.ACTIVE
         seance.save(update_fields=["status"])
 
-        # Notify eligible students that the séance has started
+        # Notify eligible students that the séance has started (code is NOT included)
         eligible = _get_seance_eligible_students(seance)
         for student in eligible:
             _push_notification(
@@ -2345,7 +2486,7 @@ class SeanceStartAPIView(APIView):
                 metadata={"seance_id": seance.id},
             )
 
-        return Response(_seance_to_dict(seance))
+        return Response(_seance_to_dict(seance, include_code=True))
 
 
 class SeanceEndAPIView(APIView):
@@ -2387,7 +2528,7 @@ class SeanceEndAPIView(APIView):
                 _handle_absence_thresholds(student, seance.course, absences_before, absences_after)
 
         return Response({
-            **_seance_to_dict(seance, include_stats=True),
+            **_seance_to_dict(seance, include_stats=True, include_code=True),
             "auto_absent_created": absent_created,
         })
 
@@ -2409,6 +2550,8 @@ class SeanceManualAttendanceAPIView(APIView):
             return Response({"error": "Forbidden."}, status=status.HTTP_403_FORBIDDEN)
         if seance.status == SeanceStatus.CANCELLED:
             return Response({"error": "Séance is cancelled."}, status=status.HTTP_400_BAD_REQUEST)
+
+        _auto_complete_expired_seance(seance)
 
         records_data = request.data.get("records", [])
         saved = 0
@@ -2521,7 +2664,7 @@ class SeanceFaceScanAPIView(APIView):
             "present_count":      sum(1 for r in roster if r["status"] == "PRESENT"),
             "absent_count":       sum(1 for r in roster if r["status"] == "ABSENT"),
             "late_count":         sum(1 for r in roster if r["status"] == "LATE"),
-            "seance":             _seance_to_dict(seance),
+            "seance":             _seance_to_dict(seance, include_code=True),
         })
 
 
@@ -2585,6 +2728,39 @@ class StudentSeanceListAPIView(APIView):
         return Response(result)
 
 
+class SeanceVerifyCodeAPIView(APIView):
+    """
+    POST /api/student/seances/<seance_id>/verify-code/
+    Body: { code }
+    Validates the séance check-in code WITHOUT doing face recognition, so the
+    frontend can unlock the camera only after the correct code is entered.
+    Returns {"valid": bool}. The code itself is never returned.
+    """
+    permission_classes = [IsAuthenticated, IsStudentUserRole]
+
+    def post(self, request, seance_id):
+        try:
+            seance = Seance.objects.get(pk=seance_id)
+        except Seance.DoesNotExist:
+            return Response({"error": "Séance not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        required_code = (seance.check_in_code or "").strip()
+        # No code configured → nothing to verify, camera can open directly.
+        if not required_code:
+            return Response({"valid": True, "requires_code": False})
+
+        submitted = (request.data.get("code") or "").strip().upper()
+        if not submitted:
+            return Response({"valid": False, "requires_code": True,
+                             "error": "Veuillez entrer le code de la séance."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if submitted != required_code.upper():
+            return Response({"valid": False, "requires_code": True,
+                             "error": "Code de séance incorrect."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        return Response({"valid": True, "requires_code": True})
+
+
 class StudentCheckInAPIView(APIView):
     """
     POST /api/student/seances/<seance_id>/check-in/
@@ -2613,48 +2789,89 @@ class StudentCheckInAPIView(APIView):
         seance_end   = seance_start + timedelta(minutes=seance.duration_minutes)
         window_open  = seance_start - timedelta(minutes=5)
 
+        # Face-match threshold. distance ∈ [0, ~1]; lower = closer match.
+        THRESHOLD = 0.5
+        # Map a distance to a 0–100 confidence %, clamped.
+        def _confidence(dist):
+            return max(0, min(100, round((1 - (dist / THRESHOLD)) * 100)))
+
         if seance.status not in (SeanceStatus.ACTIVE, SeanceStatus.SCHEDULED):
-            return Response({"error": "Cette séance n'est pas active."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Cette séance n'est pas active.", "reason": "NOT_ACTIVE", "matched": False}, status=status.HTTP_400_BAD_REQUEST)
         if now < window_open:
-            return Response({"error": f"La séance n'est pas encore accessible. Revenez après {window_open.strftime('%H:%M')}."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": f"La séance n'est pas encore accessible. Revenez après {window_open.strftime('%H:%M')}.", "reason": "WINDOW_NOT_OPEN", "matched": False}, status=status.HTTP_400_BAD_REQUEST)
         if now > seance_end:
-            return Response({"error": "La séance est terminée."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "La séance est terminée.", "reason": "WINDOW_CLOSED", "matched": False}, status=status.HTTP_400_BAD_REQUEST)
 
         # Already checked in?
-        if AttendanceRecord.objects.filter(seance=seance, student=student).exists():
-            return Response({"error": "Vous avez déjà pointé votre présence pour cette séance."}, status=status.HTTP_400_BAD_REQUEST)
+        existing = AttendanceRecord.objects.filter(seance=seance, student=student).first()
+        if existing:
+            return Response({
+                "error": "Vous avez déjà pointé votre présence pour cette séance.",
+                "reason": "ALREADY_CHECKED_IN", "matched": False,
+                "status": existing.status,
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         # Check group eligibility
         if seance.tp_group != TPGroup.NONE and student.tp_group != seance.tp_group:
-            return Response({"error": "Vous n'êtes pas dans le groupe de cette séance."}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"error": "Vous n'êtes pas dans le groupe de cette séance.", "reason": "WRONG_GROUP", "matched": False}, status=status.HTTP_403_FORBIDDEN)
+
+        # ── Séance code gate — must be correct BEFORE face recognition runs ───
+        # The code is given by the teacher in class; it is never pushed to
+        # students, so entering it proves physical presence in the room.
+        required_code = (seance.check_in_code or "").strip()
+        if required_code:
+            submitted = (request.data.get("code") or "").strip().upper()
+            if not submitted:
+                return Response({"error": "Veuillez d'abord entrer le code de la séance.", "reason": "CODE_REQUIRED", "matched": False}, status=status.HTTP_400_BAD_REQUEST)
+            if submitted != required_code.upper():
+                return Response({"error": "Code de séance incorrect.", "reason": "CODE_INVALID", "matched": False}, status=status.HTTP_400_BAD_REQUEST)
 
         # Must have face encoding registered
+        logger.info(
+            "[CheckIn] student=%s seance=%s has_encoding=%s enc_len=%s",
+            student.student_id, seance_id,
+            bool(student.face_encoding),
+            len(student.face_encoding) if student.face_encoding else 0,
+        )
         if not student.face_encoding:
-            return Response({"error": "Votre visage n'est pas encore enregistré. Contactez un administrateur."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Votre visage n'est pas encore enregistré. Contactez un administrateur.", "reason": "NO_REGISTERED_FACE", "matched": False}, status=status.HTTP_400_BAD_REQUEST)
 
         # Get uploaded selfie
         image_file = request.FILES.get("image")
         if not image_file:
-            return Response({"error": "image is required."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Aucune image fournie.", "reason": "NO_IMAGE", "matched": False}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             img_array   = fr.load_image_file(image_file)
             face_locs   = fr.face_locations(img_array)
             if not face_locs:
-                return Response({"error": "Aucun visage détecté dans l'image.", "matched": False})
+                return Response({"error": "Aucun visage détecté dans l'image.", "reason": "NO_FACE_DETECTED", "matched": False})
+            if len(face_locs) > 1:
+                return Response({"error": "Plusieurs visages détectés. Assurez-vous d'être seul dans le cadre.", "reason": "MULTIPLE_FACES", "matched": False})
             encodings   = fr.face_encodings(img_array, face_locs)
             if not encodings:
-                return Response({"error": "Impossible d'encoder le visage.", "matched": False})
+                return Response({"error": "Impossible d'analyser le visage. Améliorez l'éclairage et réessayez.", "reason": "ENCODING_FAILED", "matched": False})
 
             known_encoding  = np.array(student.face_encoding)
             selfie_encoding = encodings[0]
             distance = fr.face_distance([known_encoding], selfie_encoding)[0]
+            confidence = _confidence(distance)
 
-            if distance > 0.5:
-                return Response({"error": "Visage non reconnu. Veuillez réessayer.", "matched": False, "distance": float(distance)})
+            logger.info(
+                "[CheckIn] student=%s faces_found=%d distance=%.4f confidence=%d%% threshold=%.2f -> %s",
+                student.student_id, len(face_locs), float(distance), confidence, THRESHOLD,
+                "MATCH" if distance <= THRESHOLD else "REJECT",
+            )
+
+            if distance > THRESHOLD:
+                return Response({
+                    "error": "Visage non reconnu — ce n'est pas vous, ou la qualité est insuffisante.",
+                    "reason": "NOT_RECOGNIZED", "matched": False,
+                    "distance": float(distance), "confidence": confidence,
+                })
         except Exception as exc:
             logger.error(f"[StudentCheckIn] Face error: {exc}")
-            return Response({"error": "Erreur lors de la reconnaissance faciale."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"error": "Erreur lors de la reconnaissance faciale.", "reason": "RECOGNITION_ERROR", "matched": False}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         # Determine status: PRESENT or LATE (>15 min past start)
         minutes_late = (now - seance_start).total_seconds() / 60
@@ -2669,8 +2886,306 @@ class StudentCheckInAPIView(APIView):
         )
 
         return Response({
-            "matched":  True,
-            "status":   attendance_status,
-            "message":  "Présence enregistrée !" if attendance_status == "PRESENT" else "Présence enregistrée (en retard).",
-            "distance": float(distance),
+            "matched":     True,
+            "status":      attendance_status,
+            "reason":      "SUCCESS",
+            "message":     "Présence enregistrée !" if attendance_status == "PRESENT" else "Présence enregistrée (en retard).",
+            "distance":    float(distance),
+            "confidence":  confidence,
+            "minutes_late": round(minutes_late) if attendance_status == "LATE" else 0,
+            "checked_in_at": now.strftime("%H:%M"),
         })
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# NOVAA AI TUTOR — unified endpoint for all roles
+# POST /api/ai/ask/
+# ══════════════════════════════════════════════════════════════════════════════
+
+class NovaaAskAPIView(APIView):
+    """
+    Unified AI tutor endpoint powered by NOVAA's upgraded brain.
+    Replaces the old /api/chat/ask/ (student-only) with a multi-role endpoint.
+
+    Request body:
+      question      str  required
+      course_id     int  optional
+      session_id    int  optional
+      mode          str  optional
+      file_context  str  optional
+      student_id    str  optional (TEACHER only: for email draft context)
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        question = (request.data.get("question") or "").strip()
+        if not question:
+            return Response(
+                {"error": "question is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user       = request.user
+        role       = getattr(user, "role", "STUDENT")
+        user_name  = user.get_full_name() or user.username
+        course_id  = request.data.get("course_id")
+        session_id = request.data.get("session_id")
+        mode       = request.data.get("mode")
+        file_context = request.data.get("file_context")
+
+        # Build live platform context from DB
+        platform_context = get_platform_context(
+            user_id=user.id,
+            role=role,
+            course_id=course_id,
+        )
+
+        # Teachers: optionally attach per-student absence detail for email drafts
+        student_id_for_email = request.data.get("student_id")
+        if role == "TEACHER" and student_id_for_email:
+            email_ctx = get_email_context_for_student(
+                teacher_user_id=user.id,
+                student_id_str=str(student_id_for_email),
+            )
+            if email_ctx:
+                platform_context += "\n\n--- TARGET STUDENT FOR EMAIL ---\n" + email_ctx
+
+        try:
+            result = ask_novaa(
+                question=question,
+                user_id=user.id,
+                role=role,
+                user_name=user_name,
+                course_id=course_id,
+                session_id=session_id,
+                mode=mode,
+                file_context=file_context,
+                platform_context=platform_context,
+            )
+        except Exception as exc:
+            logger.error("[NovaaAskAPIView] ask_novaa failed for user %s: %s", user.id, exc)
+            return Response(
+                {"error": "The AI tutor encountered an unexpected error. Please try again."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        # Always return 200 — success/failure is communicated in result["success"].
+        # Returning 4xx causes the frontend to show "Connection lost" instead of
+        # the actual error message from the AI/action executor.
+        return Response(result, status=status.HTTP_200_OK)
+
+
+class NovaaAskStreamAPIView(APIView):
+    """
+    Streaming variant of NovaaAskAPIView — Server-Sent Events (SSE).
+    POST /api/ai/ask/stream/  (same body as /api/ai/ask/)
+
+    Emits a sequence of `data: {json}\\n\\n` events:
+      {"type":"token","text":"..."}            incremental answer text
+      {"type":"done", "answer":"...", ...}     final metadata (mode, sources, followups, verification)
+      {"type":"error","answer":"..."}          failure
+    The client appends tokens live, then finalises on `done`.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        question = (request.data.get("question") or "").strip()
+        if not question:
+            return Response({"error": "question is required."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        user       = request.user
+        role       = getattr(user, "role", "STUDENT")
+        user_name  = user.get_full_name() or user.username
+        course_id  = request.data.get("course_id")
+        session_id = request.data.get("session_id")
+        mode       = request.data.get("mode")
+        file_context = request.data.get("file_context")
+
+        platform_context = get_platform_context(
+            user_id=user.id, role=role, course_id=course_id,
+        )
+        student_id_for_email = request.data.get("student_id")
+        if role == "TEACHER" and student_id_for_email:
+            email_ctx = get_email_context_for_student(
+                teacher_user_id=user.id, student_id_str=str(student_id_for_email),
+            )
+            if email_ctx:
+                platform_context += "\n\n--- TARGET STUDENT FOR EMAIL ---\n" + email_ctx
+
+        def event_stream():
+            try:
+                for event in ask_novaa_stream(
+                    question=question,
+                    user_id=user.id,
+                    role=role,
+                    user_name=user_name,
+                    course_id=course_id,
+                    session_id=session_id,
+                    mode=mode,
+                    file_context=file_context,
+                    platform_context=platform_context,
+                ):
+                    yield f"data: {json.dumps(event)}\n\n"
+            except Exception as exc:
+                logger.error("[NovaaAskStream] stream failed for user %s: %s", user.id, exc)
+                err = {"type": "error",
+                       "answer": "The AI tutor encountered an unexpected error. Please try again."}
+                yield f"data: {json.dumps(err)}\n\n"
+
+        response = StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+        response["Cache-Control"] = "no-cache"
+        response["X-Accel-Buffering"] = "no"  # disable proxy buffering (nginx)
+        return response
+
+
+# ── HUD Stats endpoint (NOVAA Desktop integration) ────────────────────────────
+class HudStatsAPIView(APIView):
+    """
+    Lightweight stats endpoint consumed by the NOVAA desktop HUD.
+    Protected by a shared token in the X-HUD-Token header instead of JWT,
+    so the desktop app can call it without a user login session.
+    """
+    permission_classes = []  # token-based auth handled manually
+
+    def get(self, request):
+        from django.conf import settings as django_settings
+
+        # ── Token check ───────────────────────────────────────────────────
+        expected = getattr(django_settings, "HUD_SECRET_TOKEN", "novaa-hud-2024")
+        provided = request.META.get("HTTP_X_HUD_TOKEN", "")
+        if provided != expected:
+            return Response({"detail": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
+
+        # ── Counts ────────────────────────────────────────────────────────
+        total_students  = User.objects.filter(role="STUDENT").count()
+        total_teachers  = User.objects.filter(role="TEACHER").count()
+        total_courses   = Course.objects.count()
+
+        # Active seances (started but not yet ended)
+        active_sessions = Seance.objects.filter(status="ACTIVE").count()
+
+        # Danger zone: students whose absence count >= course max_absences
+        danger_zone_count = 0
+        for sp in StudentProfile.objects.select_related("user", "filiere").prefetch_related(
+            "filiere__filiere_courses__course"
+        ):
+            if sp.filiere is None:
+                continue
+            student = sp.user
+            in_danger = False
+            for fc in sp.filiere.filiere_courses.select_related("course").all():
+                try:
+                    course = fc.course
+                    absences = AttendanceRecord.objects.filter(
+                        student=student, course=course, status="ABSENT"
+                    ).count()
+                    if absences >= course.max_absences:
+                        in_danger = True
+                        break
+                except Exception:
+                    continue
+            if in_danger:
+                danger_zone_count += 1
+
+        # 30-day attendance rate
+        from django.utils.timezone import now as _now
+        cutoff = _now() - timedelta(days=30)
+        recent_records = AttendanceRecord.objects.filter(date__gte=cutoff)
+        total_recent = recent_records.count()
+        present_recent = recent_records.filter(status="PRESENT").count()
+        attendance_rate_30d = round((present_recent / total_recent * 100), 1) if total_recent else 0.0
+
+        # Pending face registration requests
+        try:
+            pending_face_requests = FaceRegistrationRequest.objects.filter(status="PENDING").count()
+        except Exception:
+            pending_face_requests = 0
+
+        return Response({
+            "total_students":        total_students,
+            "total_teachers":        total_teachers,
+            "total_courses":         total_courses,
+            "active_sessions":       active_sessions,
+            "danger_zone_count":     danger_zone_count,
+            "attendance_rate_30d":   attendance_rate_30d,
+            "pending_face_requests": pending_face_requests,
+        }, status=status.HTTP_200_OK)
+
+# ── NOVAA PDF Export ──────────────────────────────────────────────────────────
+class NovaaGeneratePDFView(APIView):
+    """
+    POST /api/ai/pdf/
+    Body: { content, title, doc_type, course_title }
+    Returns a PDF file as an attachment.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        content      = (request.data.get("content")      or "").strip()
+        title        = (request.data.get("title")        or "NOVAA Document").strip()
+        doc_type     = (request.data.get("doc_type")     or "general").strip()
+        course_title = (request.data.get("course_title") or "").strip()
+
+        if not content:
+            return Response({"error": "content is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        user   = request.user
+        role   = getattr(user, "role", "STUDENT")
+        author = user.get_full_name() or user.username
+
+        try:
+            from attendance.services.novaa_pdf_service import generate_pdf
+            pdf_bytes = generate_pdf(
+                content=content,
+                title=title,
+                author=author,
+                role=role,
+                doc_type=doc_type,
+                course_title=course_title,
+            )
+        except RuntimeError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        except Exception as exc:
+            logger.error("[NovaaGeneratePDF] failed: %s", exc)
+            return Response({"error": "PDF generation failed."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        safe_title = re.sub(r"[^a-zA-Z0-9_-]", "_", title)[:40]
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="novaa_{safe_title}.pdf"'
+        return response
+
+
+# ── NOVAA Send Email ──────────────────────────────────────────────────────────
+class NovaaSendEmailView(APIView):
+    """
+    POST /api/ai/send-email/
+    Body: { to_email, to_name, subject, body }
+    Sends a single email drafted by NOVAA (student → teacher, etc.)
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        to_email = (request.data.get("to_email") or "").strip()
+        to_name  = (request.data.get("to_name")  or "").strip()
+        subject  = (request.data.get("subject")  or "Message from CampusEye").strip()
+        body     = (request.data.get("body")      or "").strip()
+
+        if not to_email or not body:
+            return Response(
+                {"error": "to_email and body are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from attendance.services.novaa_action_executor import send_single_email
+        result = send_single_email(
+            sender_user_id=request.user.id,
+            to_email=to_email,
+            to_name=to_name,
+            subject=subject,
+            body=body,
+        )
+
+        if result["success"]:
+            return Response(result, status=status.HTTP_200_OK)
+        return Response(result, status=status.HTTP_502_BAD_GATEWAY)

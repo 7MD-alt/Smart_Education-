@@ -1,0 +1,161 @@
+{
+  "name": "CampusEye — Material Indexing Queue",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "*/10 * * * *" }]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every 10 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://127.0.0.1:8000/api/n8n/pending-materials/",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "X-N8N-Token", "value": "campuseye-n8n-secret-2026" }]
+        },
+        "options": { "timeout": 15000 }
+      },
+      "id": "fetch-pending",
+      "name": "Fetch pending materials",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [{
+            "id": "has-pending",
+            "leftValue": "={{ $json.total }}",
+            "rightValue": 0,
+            "operator": { "type": "number", "operation": "gt" }
+          }],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-pending",
+      "name": "Any pending?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "materials",
+        "options": {}
+      },
+      "id": "split-materials",
+      "name": "Split into individual materials",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "url": "http://127.0.0.1:8000/api/n8n/trigger-index/",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "X-N8N-Token", "value": "campuseye-n8n-secret-2026" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ \"material_id\": $json.material_id }) }}",
+        "options": { "timeout": 60000 }
+      },
+      "id": "trigger-index",
+      "name": "Trigger indexing in Django",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [{
+            "id": "indexed-ok",
+            "leftValue": "={{ $json.ok }}",
+            "rightValue": true,
+            "operator": { "type": "boolean", "operation": "true" }
+          }],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-index-ok",
+      "name": "Index succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1340, 200]
+    },
+    {
+      "parameters": { "options": {} },
+      "id": "indexed-ok-noop",
+      "name": "Indexed ✓",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1560, 120]
+    },
+    {
+      "parameters": { "options": {} },
+      "id": "index-failed-noop",
+      "name": "Index failed — will retry next cycle",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1560, 300]
+    },
+    {
+      "parameters": { "options": {} },
+      "id": "nothing-pending",
+      "name": "Nothing to index",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [900, 420]
+    }
+  ],
+  "connections": {
+    "Every 10 minutes": {
+      "main": [[{ "node": "Fetch pending materials", "type": "main", "index": 0 }]]
+    },
+    "Fetch pending materials": {
+      "main": [[{ "node": "Any pending?", "type": "main", "index": 0 }]]
+    },
+    "Any pending?": {
+      "main": [
+        [{ "node": "Split into individual materials", "type": "main", "index": 0 }],
+        [{ "node": "Nothing to index", "type": "main", "index": 0 }]
+      ]
+    },
+    "Split into individual materials": {
+      "main": [[{ "node": "Trigger indexing in Django", "type": "main", "index": 0 }]]
+    },
+    "Trigger indexing in Django": {
+      "main": [[{ "node": "Index succeeded?", "type": "main", "index": 0 }]]
+    },
+    "Index succeeded?": {
+      "main": [
+        [{ "node": "Indexed ✓", "type": "main", "index": 0 }],
+        [{ "node": "Index failed — will retry next cycle", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "tags": ["campuseye", "materials", "indexing"],
+  "triggerCount": 1,
+  "updatedAt": "2026-05-30T00:00:00.000Z",
+  "versionId": "1"
+}

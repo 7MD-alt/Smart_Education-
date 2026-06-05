@@ -5,7 +5,7 @@ import DashboardLayout from "../../components/layout/DashboardLayout";
 import {
   Calendar, Clock, CheckCircle2, XCircle, Loader2,
   Camera, AlertTriangle, BookOpen, FlaskConical,
-  GraduationCap, RefreshCw, Sparkles,
+  GraduationCap, RefreshCw, Sparkles, KeyRound,
 } from "lucide-react";
 
 // ── Countdown hook ────────────────────────────────────────────────────────────
@@ -45,26 +45,81 @@ const MyStatusBadge = ({ status }) => {
   );
 };
 
+// ── Failure-reason metadata: icon, colour, guidance, retryable ────────────────
+const REASON_META = {
+  NOT_RECOGNIZED:    { color: "#f87171", title: "Visage non reconnu",      tip: "Vérifiez que c'est bien vous, avec un bon éclairage et le visage bien centré.", retry: true  },
+  NO_FACE_DETECTED:  { color: "#fbbf24", title: "Aucun visage détecté",    tip: "Centrez votre visage dans l'ellipse et évitez le contre-jour.",                 retry: true  },
+  MULTIPLE_FACES:    { color: "#fbbf24", title: "Plusieurs visages",       tip: "Assurez-vous d'être seul(e) dans le cadre.",                                    retry: true  },
+  ENCODING_FAILED:   { color: "#fbbf24", title: "Image illisible",         tip: "Améliorez l'éclairage et tenez l'appareil stable.",                             retry: true  },
+  RECOGNITION_ERROR: { color: "#f87171", title: "Erreur technique",        tip: "Un problème est survenu côté serveur. Réessayez dans un instant.",              retry: true  },
+  ALREADY_CHECKED_IN:{ color: "#60a5fa", title: "Déjà pointé",             tip: "Votre présence a déjà été enregistrée pour cette séance.",                      retry: false },
+  WINDOW_CLOSED:     { color: "#f87171", title: "Séance terminée",         tip: "La fenêtre de pointage est fermée.",                                            retry: false },
+  WINDOW_NOT_OPEN:   { color: "#fbbf24", title: "Pas encore ouvert",       tip: "Revenez quand la séance démarre.",                                              retry: false },
+  NOT_ACTIVE:        { color: "#f87171", title: "Séance inactive",         tip: "Cette séance n'accepte pas de pointage pour le moment.",                        retry: false },
+  WRONG_GROUP:       { color: "#f87171", title: "Mauvais groupe",          tip: "Cette séance concerne un autre groupe de TP.",                                  retry: false },
+  NO_REGISTERED_FACE:{ color: "#f87171", title: "Visage non enregistré",   tip: "Contactez un administrateur pour enregistrer votre visage.",                    retry: false },
+};
+
 // ── Check-in modal ────────────────────────────────────────────────────────────
 const CheckInModal = ({ seance, onClose, onSuccess }) => {
   const toast   = useToast();
   const videoRef  = useRef(null);
   const streamRef = useRef(null);
-  const [step,   setStep]   = useState("camera"); // camera | result
+  // Flow: (code →) camera → result. Camera is only acquired AFTER a valid code.
+  const [step,   setStep]   = useState(seance.requires_code ? "code" : "camera");
   const [result, setResult] = useState(null);
   const [busy,   setBusy]   = useState(false);
   const [camErr, setCamErr] = useState(false);
+  const [code,     setCode]     = useState("");
+  const [codeBusy, setCodeBusy] = useState(false);
+  const [codeErr,  setCodeErr]  = useState("");
 
+  // Hard stop: kill every track and detach from the <video>.
+  const stopCamera = () => {
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    streamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+  };
+
+  // Validate the séance code BEFORE unlocking the camera. The code is never
+  // sent to students, so knowing it proves they're physically in the room.
+  const verifyCode = async () => {
+    const value = code.trim().toUpperCase();
+    if (!value) { setCodeErr("Entrez le code de la séance."); return; }
+    setCodeBusy(true); setCodeErr("");
+    try {
+      await axiosClient.post(`student/seances/${seance.id}/verify-code/`, { code: value });
+      setStep("camera");   // valid → the camera effect below acquires the stream
+    } catch (err) {
+      setCodeErr(err?.response?.data?.error || "Code incorrect.");
+    } finally { setCodeBusy(false); }
+  };
+
+  // Release the camera on unmount no matter which step we're on.
+  useEffect(() => () => { stopCamera(); }, []);
+
+  // Re-bind / re-acquire the stream when returning to the camera step (e.g. "Réessayer"),
+  // since the <video> element unmounts while the result is shown.
   useEffect(() => {
+    if (step !== "camera" || !videoRef.current) return;
+    let cancelled = false;
+
+    const live = streamRef.current?.getTracks().some(t => t.readyState === "live");
+    if (live) {
+      videoRef.current.srcObject = streamRef.current;
+      return;
+    }
+    // Tracks were stopped (after a success/close) — re-acquire safely.
     (async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 640 } });
+        if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
         streamRef.current = stream;
         if (videoRef.current) videoRef.current.srcObject = stream;
-      } catch { setCamErr(true); }
+      } catch { if (!cancelled) setCamErr(true); }
     })();
-    return () => { streamRef.current?.getTracks().forEach(t => t.stop()); };
-  }, []);
+    return () => { cancelled = true; };
+  }, [step]);
 
   const capture = async () => {
     if (!videoRef.current) return;
@@ -78,16 +133,29 @@ const CheckInModal = ({ seance, onClose, onSuccess }) => {
       try {
         const fd = new FormData();
         fd.append("image", blob, "selfie.jpg");
+        if (seance.requires_code) fd.append("code", code.trim().toUpperCase());
         const res = await axiosClient.post(`student/seances/${seance.id}/check-in/`, fd, {
           headers: { "Content-Type": "multipart/form-data" },
         });
-        setResult({ success: true, ...res.data });
+        // NOTE: the backend returns recognition failures as HTTP 200 with
+        // matched:false — so we MUST branch on `matched`, not on HTTP status.
+        const data = res.data ?? {};
+        if (data.matched) {
+          setResult({ success: true, ...data });
+          stopCamera();        // attendance recorded — release the camera now
+          onSuccess();         // refresh the séance list in the background (does NOT close the modal)
+        } else {
+          setResult({ success: false, ...data });
+        }
         setStep("result");
-        streamRef.current?.getTracks().forEach(t => t.stop());
-        onSuccess();
       } catch (err) {
-        const msg = err?.response?.data?.error || "Erreur de reconnaissance.";
-        setResult({ success: false, message: msg });
+        const data = err?.response?.data ?? {};
+        setResult({
+          success: false,
+          message: data.error || "Erreur de connexion. Réessayez.",
+          reason:  data.reason || "RECOGNITION_ERROR",
+          ...data,
+        });
         setStep("result");
       } finally { setBusy(false); }
     }, "image/jpeg", 0.9);
@@ -107,6 +175,41 @@ const CheckInModal = ({ seance, onClose, onSuccess }) => {
           <p className="text-xs mb-4" style={{ color: "var(--text-3)" }}>
             {seance.course_title} · {seance.session_type === "TP" ? "TP" : "Cours"}
           </p>
+
+          {step === "code" && (
+            <div className="flex flex-col gap-4 py-2">
+              <div className="flex flex-col items-center gap-2 text-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full"
+                     style={{ background: "rgba(34,211,238,0.12)", border: "1px solid rgba(34,211,238,0.4)" }}>
+                  <KeyRound className="h-7 w-7 text-cyan-400" />
+                </div>
+                <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>
+                  Code de la séance
+                </p>
+                <p className="text-xs" style={{ color: "var(--text-3)" }}>
+                  Entrez le code communiqué par votre enseignant en classe pour
+                  déverrouiller la reconnaissance faciale.
+                </p>
+              </div>
+              <input
+                value={code}
+                onChange={e => { setCode(e.target.value.toUpperCase()); setCodeErr(""); }}
+                onKeyDown={e => e.key === "Enter" && verifyCode()}
+                maxLength={12}
+                autoFocus
+                placeholder="EX : X4JXQR"
+                className="w-full rounded-[var(--radius)] px-4 py-3 text-center text-lg font-bold tracking-[0.3em] outline-none"
+                style={{ background: "var(--bg)", border: `1px solid ${codeErr ? "#f87171" : "var(--border)"}`,
+                         color: "var(--text-1)" }}
+              />
+              {codeErr && <p className="text-xs text-center text-red-400">{codeErr}</p>}
+              <button onClick={verifyCode} disabled={codeBusy}
+                      className="btn-cyan w-full py-2.5 gap-2 disabled:opacity-40">
+                {codeBusy ? <><Loader2 className="h-4 w-4 animate-spin" /> Vérification…</>
+                          : <><KeyRound className="h-4 w-4" /> Valider le code</>}
+              </button>
+            </div>
+          )}
 
           {step === "camera" && (
             <>
@@ -153,39 +256,88 @@ const CheckInModal = ({ seance, onClose, onSuccess }) => {
             </>
           )}
 
-          {step === "result" && (
+          {step === "result" && result?.success && (
             <div className="flex flex-col items-center gap-4 py-4 text-center">
-              {result?.success ? (
-                <>
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full"
-                       style={{ background: "rgba(21,128,61,0.15)", border: "2px solid #4ade80" }}>
-                    <CheckCircle2 className="h-8 w-8 text-green-400" />
+              <div className="flex h-16 w-16 items-center justify-center rounded-full"
+                   style={{ background: "rgba(21,128,61,0.15)", border: "2px solid #4ade80", boxShadow: "0 0 24px rgba(74,222,128,0.25)" }}>
+                {result.status === "LATE"
+                  ? <Clock className="h-8 w-8 text-amber-400" />
+                  : <CheckCircle2 className="h-8 w-8 text-green-400" />}
+              </div>
+              <div>
+                <p className="text-base font-bold" style={{ color: result.status === "LATE" ? "#fbbf24" : "#4ade80" }}>
+                  {result.message}
+                </p>
+                <p className="text-xs mt-1" style={{ color: "var(--text-3)" }}>
+                  Statut : <strong style={{ color: "var(--text-1)" }}>{result.status === "LATE" ? "En retard" : "Présent"}</strong>
+                  {result.checked_in_at && <> · à {result.checked_in_at}</>}
+                  {result.status === "LATE" && result.minutes_late > 0 && <> · +{result.minutes_late} min</>}
+                </p>
+              </div>
+
+              {/* Match confidence review */}
+              {result.confidence != null && (
+                <div className="w-full">
+                  <div className="flex justify-between text-[10px] mb-1" style={{ color: "var(--text-3)" }}>
+                    <span>Confiance de reconnaissance</span>
+                    <span style={{ color: "#4ade80", fontWeight: 700 }}>{result.confidence}%</span>
                   </div>
-                  <div>
-                    <p className="text-base font-bold text-green-400">{result.message}</p>
-                    <p className="text-xs mt-1" style={{ color: "var(--text-3)" }}>
-                      Statut : <strong>{result.status === "LATE" ? "En retard" : "Présent"}</strong>
-                    </p>
+                  <div className="progress-track">
+                    <div className="progress-fill"
+                         style={{ width: `${result.confidence}%`, background: "linear-gradient(90deg,#15803d,#4ade80)", boxShadow: "0 0 6px #4ade8060" }} />
                   </div>
-                </>
-              ) : (
-                <>
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full"
-                       style={{ background: "rgba(185,28,28,0.15)", border: "2px solid #f87171" }}>
-                    <XCircle className="h-8 w-8 text-red-400" />
-                  </div>
-                  <div>
-                    <p className="text-base font-bold text-red-400">Échec</p>
-                    <p className="text-xs mt-1" style={{ color: "var(--text-3)" }}>{result.message}</p>
-                  </div>
-                  <button onClick={() => setStep("camera")}
-                          className="btn-ghost text-sm px-4 py-2">
-                    Réessayer
-                  </button>
-                </>
+                </div>
               )}
             </div>
           )}
+
+          {step === "result" && !result?.success && (() => {
+            const meta = REASON_META[result?.reason] || { color: "#f87171", title: "Échec", tip: result?.message, retry: true };
+            return (
+              <div className="flex flex-col items-center gap-4 py-4 text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full"
+                     style={{ background: `${meta.color}22`, border: `2px solid ${meta.color}`, boxShadow: `0 0 24px ${meta.color}30` }}>
+                  {result?.reason === "ALREADY_CHECKED_IN"
+                    ? <CheckCircle2 className="h-8 w-8" style={{ color: meta.color }} />
+                    : <AlertTriangle className="h-8 w-8" style={{ color: meta.color }} />}
+                </div>
+
+                <div>
+                  <p className="text-base font-bold" style={{ color: meta.color }}>{meta.title}</p>
+                  <p className="text-xs mt-1.5 leading-relaxed" style={{ color: "var(--text-3)" }}>{meta.tip}</p>
+                </div>
+
+                {/* Already-checked-in shows the existing status */}
+                {result?.reason === "ALREADY_CHECKED_IN" && result?.status && (
+                  <MyStatusBadge status={result.status} />
+                )}
+
+                {/* Low-confidence failures still show the meter so students see how close they were */}
+                {result?.confidence != null && (
+                  <div className="w-full">
+                    <div className="flex justify-between text-[10px] mb-1" style={{ color: "var(--text-3)" }}>
+                      <span>Confiance de reconnaissance</span>
+                      <span style={{ color: meta.color, fontWeight: 700 }}>{result.confidence}%</span>
+                    </div>
+                    <div className="progress-track">
+                      <div className="progress-fill"
+                           style={{ width: `${Math.max(result.confidence, 3)}%`, background: `linear-gradient(90deg,${meta.color}80,${meta.color})`, boxShadow: `0 0 6px ${meta.color}60` }} />
+                    </div>
+                    <p className="text-[10px] mt-1" style={{ color: "var(--text-3)" }}>
+                      Seuil requis : 100% à partir d'une correspondance suffisante.
+                    </p>
+                  </div>
+                )}
+
+                {meta.retry && (
+                  <button onClick={() => { setResult(null); setStep("camera"); }}
+                          className="btn-cyan text-sm px-4 py-2 gap-1.5">
+                    <Camera className="h-3.5 w-3.5" /> Réessayer
+                  </button>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         <div className="px-5 pb-5">
@@ -366,7 +518,7 @@ const StudentSeancesPage = () => {
         <CheckInModal
           seance={checkInSrc}
           onClose={() => setCheckInSrc(null)}
-          onSuccess={() => { setCheckInSrc(null); load(); }}
+          onSuccess={load}   /* refresh list in background; modal stays to show the review */
         />
       )}
     </DashboardLayout>

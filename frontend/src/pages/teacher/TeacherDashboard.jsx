@@ -12,17 +12,49 @@ import {
 
 /* ── Glow stat card ──────────────────────────────────────────── */
 const StatCard = ({ label, value, icon: Icon, accent, glow, delay = 0 }) => (
-  <div className="stat-card fade-up group" style={{ animationDelay: `${delay}ms` }}>
-    <div className="pointer-events-none absolute right-0 top-0 h-20 w-20 rounded-full"
-         style={{ background: glow, filter: "blur(24px)", opacity: 0.6 }} />
-    <div className="relative flex items-start justify-between">
-      <p className="stat-label">{label}</p>
-      <div className="flex h-8 w-8 items-center justify-center rounded-[var(--radius)] transition-transform duration-200 group-hover:scale-110"
-           style={{ background: glow, border: `1px solid ${accent}30` }}>
-        <Icon className="h-4 w-4" style={{ color: accent, filter: `drop-shadow(0 0 4px ${accent})` }} />
+  <div
+    className="fade-up group relative overflow-hidden rounded-[var(--radius-lg)] p-6 cursor-default spotlight"
+    style={{
+      animationDelay: `${delay}ms`,
+      background: "var(--surface)", backdropFilter: "blur(20px)",
+      border: `1px solid ${accent}20`,
+      transition: "border-color 220ms, box-shadow 220ms, transform 220ms",
+    }}
+    onMouseEnter={e => {
+      e.currentTarget.style.borderColor = `${accent}45`;
+      e.currentTarget.style.boxShadow = `0 0 50px ${glow.replace("0.15","0.2")}, 0 8px 32px rgba(0,0,0,0.4)`;
+      e.currentTarget.style.transform = "translateY(-3px)";
+      const bar = e.currentTarget.querySelector("[data-accent-bar]");
+      if (bar) bar.style.transform = "scaleX(1)";
+    }}
+    onMouseLeave={e => {
+      e.currentTarget.style.borderColor = `${accent}20`;
+      e.currentTarget.style.boxShadow = "none";
+      e.currentTarget.style.transform = "none";
+      const bar = e.currentTarget.querySelector("[data-accent-bar]");
+      if (bar) bar.style.transform = "scaleX(0)";
+    }}
+  >
+    <div className="pointer-events-none absolute -right-4 -top-4 h-28 w-28 rounded-full"
+      style={{ background: `radial-gradient(circle, ${accent}28 0%, transparent 70%)`, filter: "blur(18px)" }} />
+    <div data-accent-bar className="pointer-events-none absolute bottom-0 left-0 right-0 h-[2px]"
+      style={{
+        background: `linear-gradient(90deg, transparent, ${accent}60, transparent)`,
+        transform: "scaleX(0)", transformOrigin: "left",
+        transition: "transform 400ms cubic-bezier(0.16,1,0.3,1)",
+      }} />
+
+    <div className="relative flex items-start justify-between mb-4">
+      <p className="label">{label}</p>
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-300 group-hover:scale-110"
+        style={{ background: `linear-gradient(135deg, ${accent}22, ${accent}10)`, border: `1px solid ${accent}35`, boxShadow: `0 0 14px ${accent}20` }}>
+        <Icon className="h-5 w-5" style={{ color: accent, filter: `drop-shadow(0 0 4px ${accent})` }} />
       </div>
     </div>
-    <p className="stat-value relative count-enter" style={{ animationDelay: `${delay + 80}ms` }}>{value ?? "—"}</p>
+    <p className="relative count-enter"
+      style={{ fontSize: "2.4rem", fontWeight: 750, letterSpacing: "-0.05em", color: accent, lineHeight: 1, textShadow: `0 0 32px ${accent}65`, animationDelay: `${delay + 80}ms` }}>
+      {value ?? "—"}
+    </p>
   </div>
 );
 
@@ -41,7 +73,7 @@ const CourseCard = ({ course, index }) => {
   return (
     <Link to="/teacher/courses" className="block fade-up" style={{ animationDelay: `${index * 60}ms` }}>
       <div
-        className="group relative overflow-hidden rounded-[var(--radius-lg)] p-5 transition-all duration-200 cursor-pointer"
+        className="spotlight group relative overflow-hidden rounded-[var(--radius-lg)] p-5 transition-all duration-200 cursor-pointer"
         style={{ border: `1px solid var(--border)`, background: "var(--surface)" }}
         onMouseEnter={e => { e.currentTarget.style.borderColor = `${accent}40`; e.currentTarget.style.boxShadow = `0 4px 24px ${glow}`; }}
         onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.boxShadow = "none"; }}
@@ -77,7 +109,7 @@ const CourseCard = ({ course, index }) => {
 
 /* ── Attendance summary row ──────────────────────────────────── */
 const SummaryPill = ({ label, value, color, icon: Icon, glow }) => (
-  <div className="flex items-center gap-3 rounded-[var(--radius-lg)] p-4 transition-all duration-150"
+  <div className="spotlight flex items-center gap-3 rounded-[var(--radius-lg)] p-4 transition-all duration-150"
        style={{ border: `1px solid ${color}30`, background: glow }}>
     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius)]"
          style={{ background: `${color}20`, border: `1px solid ${color}30` }}>
@@ -85,7 +117,7 @@ const SummaryPill = ({ label, value, color, icon: Icon, glow }) => (
     </div>
     <div>
       <p className="label">{label}</p>
-      <p className="mt-0.5 text-xl font-bold tabular-nums" style={{ color }}>{value}</p>
+      <p className="mt-0.5 tabular-nums" style={{ fontSize: "1.5rem", fontWeight: 750, letterSpacing: "-0.03em", lineHeight: 1, color }}>{value}</p>
     </div>
   </div>
 );
@@ -129,15 +161,19 @@ const TeacherDashboard = () => {
         {/* Header */}
         <div className="page-header fade-up">
           <div>
-            <p className="label mb-1">Teacher Portal</p>
-            <h1 className="page-title">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="h-px flex-1 max-w-[40px]"
+                style={{ background: "linear-gradient(90deg, rgba(34,211,238,0.5), transparent)" }} />
+              <p className="label">Teacher Portal</p>
+            </div>
+            <h1 style={{ fontSize: "2.25rem", fontWeight: 750, letterSpacing: "-0.04em", color: "#f0f0ff", lineHeight: 1.1 }}>
               Good day,{" "}
               <span style={{
-                background: "linear-gradient(135deg, #22d3ee, #a78bfa)",
+                background: "linear-gradient(135deg, #22d3ee 0%, #a78bfa 60%, #f472b6 100%)",
                 WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
               }}>{firstName}</span>
             </h1>
-            <p className="page-sub">Manage your courses, materials, and attendance.</p>
+            <p className="page-sub mt-2">Courses · Materials · Attendance</p>
           </div>
           <Link to="/teacher/scan">
             <button className="btn-cyan gap-1.5">
@@ -159,13 +195,18 @@ const TeacherDashboard = () => {
 
         {/* Attendance summary */}
         {summary && (
-          <div className="card fade-up" style={{ animationDelay: "200ms" }}>
+          <div className="card spotlight fade-up" style={{ animationDelay: "200ms" }}>
             <div className="flex items-center gap-2 mb-5">
               <TrendingUp className="h-4 w-4 text-green-400" />
-              <h2 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Attendance Overview</h2>
+              <h2 style={{ fontSize: "0.8125rem", fontWeight: 650, letterSpacing: "-0.01em", color: "var(--text-1)" }}>Attendance Overview</h2>
               <div className="ml-auto flex items-center gap-2">
-                <span className="text-2xl font-bold tabular-nums"
-                      style={{ color: summary.attendance_rate >= 75 ? "#4ade80" : summary.attendance_rate >= 50 ? "#fbbf24" : "#f87171" }}>
+                <span
+                  className="tabular-nums"
+                  style={{
+                    fontSize: "1.75rem", fontWeight: 750, letterSpacing: "-0.04em", lineHeight: 1,
+                    color: summary.attendance_rate >= 75 ? "#4ade80" : summary.attendance_rate >= 50 ? "#fbbf24" : "#f87171",
+                    textShadow: `0 0 20px ${summary.attendance_rate >= 75 ? "#4ade8055" : summary.attendance_rate >= 50 ? "#fbbf2455" : "#f8717155"}`,
+                  }}>
                   {summary.attendance_rate}%
                 </span>
                 <span className="text-xs" style={{ color: "var(--text-3)" }}>overall rate</span>
@@ -194,7 +235,7 @@ const TeacherDashboard = () => {
         {/* Courses */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>My Courses</h2>
+            <h2 style={{ fontSize: "0.8125rem", fontWeight: 650, letterSpacing: "-0.01em", color: "var(--text-1)" }}>My Courses</h2>
             <span className="badge badge-cyan">{courses.length} {courses.length === 1 ? "course" : "courses"}</span>
           </div>
 

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import axiosClient from "../../api/axiosClient";
 import DashboardLayout from "../../components/layout/DashboardLayout";
-import { Layers, Plus, Search, Edit2, Trash2, X, AlertCircle, Building2, GraduationCap } from "lucide-react";
+import { Layers, Plus, Search, Edit2, Trash2, X, AlertCircle, Building2, GraduationCap, Eye, Hash, BookOpen } from "lucide-react";
 
 const Modal = ({ open, onClose, title, children, onSave, saving }) => {
   if (!open) return null;
@@ -29,34 +29,151 @@ const Modal = ({ open, onClose, title, children, onSave, saving }) => {
   );
 };
 
+/* ── Detail modal ─────────────────────────────────────────────── */
+const FiliereDetailModal = ({ open, onClose, filiere, students, courses, filiereCourses }) => {
+  if (!open || !filiere) return null;
+
+  const filiereStudents = students.filter(s => (s.filiere?.id ?? s.filiere) === filiere.id);
+  const linkedCourses   = filiereCourses
+    .filter(fc => (fc.filiere?.id ?? fc.filiere) === filiere.id)
+    .map(fc => ({ ...courses.find(c => c.id === (fc.course?.id ?? fc.course)), semester: fc.semester }))
+    .filter(Boolean);
+
+  const bySemester = filiereStudents.reduce((acc, s) => {
+    const sem = s.semester ?? "?";
+    acc[sem] = (acc[sem] || 0) + 1;
+    return acc;
+  }, {});
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.75)" }}>
+      <div className="relative flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0c1120] shadow-2xl">
+
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-pink-500/10 border border-pink-500/25">
+              <Layers className="h-5 w-5 text-pink-400" />
+            </div>
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-widest text-white/30">Filiere</p>
+              <h3 className="text-lg font-semibold text-white">{filiere.name}</h3>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-white/40 hover:text-white transition"><X className="h-5 w-5" /></button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+          {/* Identity chips */}
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: "Code",       value: filiere.code,                          color: "text-pink-300"   },
+              { label: "Department", value: filiere.department?.code ?? "—",       color: "text-blue-300"   },
+              { label: "Students",   value: filiereStudents.length,                color: "text-green-300"  },
+            ].map(({ label, value, color }) => (
+              <div key={label} className="rounded-xl border border-white/8 bg-white/[0.03] p-4 text-center">
+                <p className={`text-xl font-bold ${color}`}>{value}</p>
+                <p className="text-[10px] text-white/30 mt-0.5">{label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Department info row */}
+          <div className="flex items-center gap-2 rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3">
+            <Building2 className="h-4 w-4 text-white/30 shrink-0" />
+            <span className="text-sm text-white/60">{filiere.department?.name ?? "No department"}</span>
+          </div>
+
+          {/* Students by semester */}
+          {filiereStudents.length > 0 && (
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wider text-white/30 mb-3">Students by semester</p>
+              <div className="grid grid-cols-4 gap-2">
+                {Object.entries(bySemester).sort(([a],[b]) => Number(a)-Number(b)).map(([sem, count]) => (
+                  <div key={sem} className="rounded-xl border border-white/8 bg-white/[0.03] p-3 text-center">
+                    <p className="text-lg font-bold text-violet-300">{count}</p>
+                    <p className="text-[10px] text-white/30">S{sem}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Linked courses */}
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wider text-white/30 mb-3">
+              Linked courses <span className="text-white/20 ml-1">({linkedCourses.length})</span>
+            </p>
+            {linkedCourses.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-6 text-center">
+                <BookOpen className="h-7 w-7 text-white/15 mb-2" />
+                <p className="text-sm text-white/40">No courses linked yet.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {linkedCourses.map((c, i) => (
+                  <div key={i} className="flex items-center justify-between rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500/10 border border-amber-500/20">
+                        <BookOpen className="h-3.5 w-3.5 text-amber-400" />
+                      </div>
+                      <p className="text-sm font-medium text-white">{c.title}</p>
+                    </div>
+                    <span className="rounded-full px-2 py-0.5 text-[10px] font-medium bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
+                      S{c.semester}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex justify-end border-t border-white/10 px-6 py-4">
+          <button onClick={onClose} className="rounded-lg border border-white/10 px-5 py-2 text-sm text-white/60 hover:bg-white/[0.05] transition">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const FilieresPage = () => {
-  const [filieres,    setFilieres]    = useState([]);
-  const [departments, setDepartments] = useState([]);
-  const [students,    setStudents]    = useState([]);
-  const [search,      setSearch]      = useState("");
-  const [deptFilter,  setDeptFilter]  = useState("ALL");
-  const [loading,     setLoading]     = useState(true);
-  const [modalOpen,   setModalOpen]   = useState(false);
-  const [editing,     setEditing]     = useState(null);
-  const [delTarget,   setDelTarget]   = useState(null);
-  const [deleting,    setDeleting]    = useState(false);
-  const [saving,      setSaving]      = useState(false);
-  const [form,        setForm]        = useState({ code: "", name: "", department_id: "" });
-  const [formErr,     setFormErr]     = useState("");
+  const [filieres,      setFilieres]      = useState([]);
+  const [departments,   setDepartments]   = useState([]);
+  const [students,      setStudents]      = useState([]);
+  const [courses,       setCourses]       = useState([]);
+  const [filiereCourses,setFiliereCourses]= useState([]);
+  const [search,        setSearch]        = useState("");
+  const [deptFilter,    setDeptFilter]    = useState("ALL");
+  const [loading,       setLoading]       = useState(true);
+  const [modalOpen,     setModalOpen]     = useState(false);
+  const [editing,       setEditing]       = useState(null);
+  const [delTarget,     setDelTarget]     = useState(null);
+  const [detailTarget,  setDetailTarget]  = useState(null);
+  const [deleting,      setDeleting]      = useState(false);
+  const [saving,        setSaving]        = useState(false);
+  const [form,          setForm]          = useState({ code: "", name: "", department_id: "" });
+  const [formErr,       setFormErr]       = useState("");
 
   useEffect(() => { fetchAll(); }, []);
 
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [f, d, s] = await Promise.all([
+      const [f, d, s, c, fc] = await Promise.all([
         axiosClient.get("filieres/"),
         axiosClient.get("departments/"),
         axiosClient.get("student-profiles/"),
+        axiosClient.get("courses/"),
+        axiosClient.get("filiere-courses/"),
       ]);
       setFilieres(Array.isArray(f.data) ? f.data : f.data.results || []);
       setDepartments(Array.isArray(d.data) ? d.data : d.data.results || []);
       setStudents(Array.isArray(s.data) ? s.data : s.data.results || []);
+      setCourses(Array.isArray(c.data) ? c.data : c.data.results || []);
+      setFiliereCourses(Array.isArray(fc.data) ? fc.data : fc.data.results || []);
     } catch { /* silent */ }
     finally { setLoading(false); }
   };
@@ -179,6 +296,12 @@ const FilieresPage = () => {
                     </td>
                     <td>
                       <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => setDetailTarget(f)}
+                                className="btn p-2 text-pink-400"
+                                style={{ border: "1px solid rgba(190,24,93,0.2)", background: "rgba(190,24,93,0.06)" }}
+                                title="View details">
+                          <Eye className="h-3.5 w-3.5" />
+                        </button>
                         <button onClick={() => openEdit(f)} className="btn-ghost p-2"><Edit2 className="h-3.5 w-3.5" /></button>
                         <button onClick={() => setDelTarget(f)} className="btn p-2 text-red-400"
                                 style={{ border: "1px solid rgba(185,28,28,0.2)", background: "rgba(185,28,28,0.06)" }}>
@@ -236,6 +359,10 @@ const FilieresPage = () => {
           </div>
         </div>
       )}
+
+      <FiliereDetailModal open={!!detailTarget} onClose={() => setDetailTarget(null)}
+                          filiere={detailTarget} students={students}
+                          courses={courses} filiereCourses={filiereCourses} />
     </DashboardLayout>
   );
 };

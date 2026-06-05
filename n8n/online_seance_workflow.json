@@ -1,0 +1,84 @@
+{
+  "name": "CampusEye — Online Séance (Google Meet)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "campuseye/online-seance",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook — Schedule Online Séance",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "campuseye-online-seance"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build a Google Calendar event payload that includes a Google Meet link\n// and all students as guests. Google will email every guest automatically.\nconst b = $input.first().json.body ?? $input.first().json;\n\nconst courseTitle  = b.course_title  || 'Séance en ligne';\nconst date         = b.date;            // \"2026-06-10\"\nconst startTime    = b.start_time;      // \"14:00\"\nconst duration     = Number(b.duration_minutes) || 60;\nconst teacherEmail = b.teacher_email || null;\nconst students     = Array.isArray(b.students) ? b.students : [];\n\nif (!date || !startTime) throw new Error('date and start_time are required (YYYY-MM-DD, HH:MM).');\n\n// Format naive local wall-clock strings (Google applies the timeZone below)\nconst pad   = (n) => String(n).padStart(2, '0');\nconst naive = (d) => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;\n\nconst start = new Date(`${date}T${startTime}:00`);\nconst end   = new Date(start.getTime() + duration * 60000);\nconst tz    = 'Africa/Casablanca';\n\nconst attendees = students.filter(s => s && s.email).map(s => ({ email: s.email }));\nif (teacherEmail) attendees.push({ email: teacherEmail });\n\nconst event = {\n  summary: `${courseTitle} — Séance en ligne`,\n  description: `Séance en ligne CampusEye — ${courseTitle}. Rejoignez via le lien Google Meet.`,\n  start: { dateTime: naive(start), timeZone: tz },\n  end:   { dateTime: naive(end),   timeZone: tz },\n  attendees,\n  reminders: { useDefault: true },\n  conferenceData: {\n    createRequest: {\n      requestId: `campuseye-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,\n      conferenceSolutionKey: { type: 'hangoutsMeet' },\n    },\n  },\n};\n\nreturn [{ json: { event } }];"
+      },
+      "id": "prepare-event",
+      "name": "Prepare Calendar Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/calendar/v3/calendars/primary/events",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "conferenceDataVersion", "value": "1" },
+            { "name": "sendUpdates", "value": "all" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.event) }}",
+        "options": {}
+      },
+      "id": "create-meet",
+      "name": "Create Google Meet Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 300],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_GOOGLE_CREDENTIAL_ID",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"meet_url\": ($json.hangoutLink || ($json.conferenceData && $json.conferenceData.entryPoints ? $json.conferenceData.entryPoints[0].uri : null)), \"event_id\": $json.id } }}",
+        "options": {}
+      },
+      "id": "respond-node",
+      "name": "Respond with Meet Link",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [930, 300]
+    }
+  ],
+  "connections": {
+    "Webhook — Schedule Online Séance": {
+      "main": [[{ "node": "Prepare Calendar Event", "type": "main", "index": 0 }]]
+    },
+    "Prepare Calendar Event": {
+      "main": [[{ "node": "Create Google Meet Event", "type": "main", "index": 0 }]]
+    },
+    "Create Google Meet Event": {
+      "main": [[{ "node": "Respond with Meet Link", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false
+}

@@ -1,573 +1,842 @@
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { motion, useScroll, useTransform, useSpring } from "framer-motion";
 import {
-  ArrowRight, Sparkles, GraduationCap, Users,
-  ShieldCheck, Brain, Zap, BarChart3, TrendingUp,
-  CheckCircle2, MessageCircle, ScanLine, Star,
-  BookOpen, Activity, Camera,
+  ArrowRight, Zap, ScanLine, Brain, BarChart3,
+  ShieldCheck, BookOpen, Users, CalendarCheck,
+  CheckCircle2, ChevronRight, Sparkles,
 } from "lucide-react";
 
-/* ── Animation helpers ───────────────────────────────────────── */
-const rise = (delay = 0) => ({
-  initial: { opacity: 0, y: 28 },
+/* ────────────────────────────────────────────────────────────────
+   CONSTANTS
+──────────────────────────────────────────────────────────────── */
+const ease = [0.22, 1, 0.36, 1];
+const up = (d = 0, y = 30) => ({
+  initial:     { opacity: 0, y },
   whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true, amount: 0.12 },
-  transition: { duration: 0.6, delay, ease: [0.22, 1, 0.36, 1] },
+  viewport:    { once: true, amount: 0.15 },
+  transition:  { duration: 0.65, delay: d, ease },
 });
-const riseLeft = (delay = 0) => ({
-  initial: { opacity: 0, x: -28 },
+const left = (d = 0) => ({
+  initial:     { opacity: 0, x: -30 },
   whileInView: { opacity: 1, x: 0 },
-  viewport: { once: true, amount: 0.12 },
-  transition: { duration: 0.6, delay, ease: [0.22, 1, 0.36, 1] },
+  viewport:    { once: true, amount: 0.15 },
+  transition:  { duration: 0.65, delay: d, ease },
 });
 
-/* ── Section label pill ──────────────────────────────────────── */
-const Pill = ({ children, accent }) => (
-  <span
-    className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-widest"
-    style={{
-      border: `1px solid ${accent || "var(--border)"}`,
-      background: accent ? `${accent}15` : "var(--surface)",
-      color: accent || "var(--text-3)",
-    }}
-  >
-    {children}
-  </span>
-);
+/* ────────────────────────────────────────────────────────────────
+   LIVE SCAN TERMINAL MOCKUP (pure CSS)
+──────────────────────────────────────────────────────────────── */
+const TerminalMockup = () => {
+  const [tick, setTick] = useState(0);
+  const rows = [
+    { id: "S4-001", name: "Ahmed Alaoui",    status: "PRESENT", conf: 98.2, time: "09:01:14" },
+    { id: "S4-002", name: "Sara Benali",     status: "PRESENT", conf: 96.7, time: "09:01:16" },
+    { id: "S4-003", name: "Imane Drissi",    status: "LATE",    conf: 94.1, time: "09:01:19" },
+    { id: "S4-004", name: "Younes Idrissi",  status: "PRESENT", conf: 97.8, time: "09:01:21" },
+    { id: "S4-005", name: "Kenza Moussaoui", status: "ABSENT",  conf: 0,   time: "—"         },
+  ];
 
-/* ── Animated mesh grid background ──────────────────────────── */
-const Background = () => (
-  <>
-    {/* Dot grid */}
-    <div
-      className="pointer-events-none fixed inset-0 z-0"
-      style={{
-        backgroundImage: "radial-gradient(rgba(255,255,255,0.025) 1px, transparent 1px)",
-        backgroundSize: "28px 28px",
-      }}
-    />
-    {/* Radial color blobs */}
-    <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-      <div className="absolute -top-40 -left-40 h-[600px] w-[600px] rounded-full"
-           style={{ background: "radial-gradient(circle, rgba(124,58,237,0.08), transparent 70%)" }} />
-      <div className="absolute -bottom-60 -right-40 h-[700px] w-[700px] rounded-full"
-           style={{ background: "radial-gradient(circle, rgba(8,145,178,0.06), transparent 70%)" }} />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[500px] w-[500px] rounded-full"
-           style={{ background: "radial-gradient(circle, rgba(190,24,93,0.03), transparent 70%)" }} />
-    </div>
-  </>
-);
+  useEffect(() => {
+    const t = setInterval(() => setTick(v => (v + 1) % 4), 1800);
+    return () => clearInterval(t);
+  }, []);
 
-/* ── Gradient separator line ─────────────────────────────────── */
-const Sep = () => (
-  <div className="mx-auto my-2 h-px max-w-5xl"
-       style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.07) 30%, rgba(255,255,255,0.07) 70%, transparent)" }} />
-);
+  const statusColor = {
+    PRESENT: { color: "#4ade80", bg: "rgba(21,128,61,0.15)" },
+    LATE:    { color: "#fbbf24", bg: "rgba(180,83,9,0.15)"  },
+    ABSENT:  { color: "#f87171", bg: "rgba(185,28,28,0.15)" },
+  };
 
-export default function LandingPage() {
   return (
-    <div className="relative min-h-screen overflow-x-hidden antialiased" style={{ background: "var(--bg)", color: "var(--text-1)" }}>
-      <Background />
+    <div
+      className="relative w-full overflow-hidden rounded-2xl"
+      style={{
+        background: "rgba(4,4,16,0.92)",
+        border: "1px solid rgba(139,92,246,0.2)",
+        boxShadow: "0 0 60px rgba(124,58,237,0.18), 0 40px 80px rgba(0,0,0,0.6)",
+      }}
+    >
+      {/* Top bar */}
+      <div className="flex items-center gap-2 px-4 py-3"
+        style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", background: "rgba(139,92,246,0.06)" }}>
+        <div className="flex gap-1.5">
+          {["#f87171","#fbbf24","#4ade80"].map(c => (
+            <div key={c} className="h-2.5 w-2.5 rounded-full" style={{ background: c, opacity: 0.8 }} />
+          ))}
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <span className="text-[10px] font-mono" style={{ color: "rgba(139,92,246,0.7)" }}>
+            campuseye — live_attendance.scan
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
+          <span className="text-[9px] font-mono" style={{ color: "#4ade80" }}>LIVE</span>
+        </div>
+      </div>
+
+      {/* Session header */}
+      <div className="px-4 py-3 flex items-center justify-between"
+        style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+        <div>
+          <p className="text-xs font-semibold" style={{ color: "#f0f0ff", letterSpacing: "-0.01em" }}>
+            Réseaux Informatiques — Cours
+          </p>
+          <p className="text-[10px] mt-0.5 font-mono" style={{ color: "rgba(120,120,160,0.8)" }}>
+            Séance #42 · {new Date().toLocaleDateString("fr-FR")} · 09:00
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <ScanLine className="h-3.5 w-3.5 text-cyan-400 animate-pulse" />
+          <span className="text-[10px] font-mono" style={{ color: "#22d3ee" }}>
+            SCANNING{".".repeat((tick % 3) + 1)}
+          </span>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="px-4 py-2">
+        <div className="mb-2 grid grid-cols-[1fr_auto_auto] gap-x-4"
+          style={{ color: "rgba(80,80,120,0.8)", fontSize: 9, fontFamily: "monospace", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+          <span>Student</span><span>Conf</span><span>Status</span>
+        </div>
+        <div className="space-y-1.5">
+          {rows.map((r, i) => {
+            const s = statusColor[r.status];
+            return (
+              <motion.div
+                key={r.id}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.12, ease }}
+                className="grid grid-cols-[1fr_auto_auto] gap-x-4 items-center rounded-lg px-2 py-1.5"
+                style={{ background: i === tick ? "rgba(139,92,246,0.07)" : "transparent" }}
+              >
+                <div className="min-w-0">
+                  <span className="text-[11px] font-medium" style={{ color: i === tick ? "#f0f0ff" : "rgba(200,200,220,0.7)" }}>
+                    {r.name}
+                  </span>
+                  <span className="ml-2 text-[9px] font-mono" style={{ color: "rgba(80,80,120,0.7)" }}>
+                    {r.id}
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono tabular-nums" style={{ color: r.conf > 0 ? "rgba(160,160,200,0.8)" : "rgba(80,80,120,0.5)" }}>
+                  {r.conf > 0 ? `${r.conf}%` : "—"}
+                </span>
+                <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-bold"
+                  style={{ color: s.color, background: s.bg, letterSpacing: "0.04em" }}>
+                  {r.status}
+                </span>
+              </motion.div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Bottom stats */}
+      <div className="mx-4 mt-2 mb-4 grid grid-cols-3 gap-2">
+        {[
+          { label: "Present", value: "3", color: "#4ade80" },
+          { label: "Late",    value: "1", color: "#fbbf24" },
+          { label: "Absent",  value: "1", color: "#f87171" },
+        ].map(({ label, value, color }) => (
+          <div key={label} className="rounded-lg px-3 py-2 text-center"
+            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)" }}>
+            <p className="text-base font-bold" style={{ color, letterSpacing: "-0.02em" }}>{value}</p>
+            <p className="text-[9px] mt-0.5 font-mono uppercase" style={{ color: "rgba(100,100,130,0.7)", letterSpacing: "0.06em" }}>{label}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+/* ────────────────────────────────────────────────────────────────
+   BENTO CARD
+──────────────────────────────────────────────────────────────── */
+const BentoCard = ({ children, className = "", style = {}, hover = true }) => {
+  const [pos, setPos] = useState({ x: "50%", y: "50%" });
+  return (
+    <div
+      className={`group relative overflow-hidden rounded-2xl ${className}`}
+      style={{
+        background: "rgba(6,6,20,0.8)",
+        backdropFilter: "blur(20px) saturate(1.4)",
+        WebkitBackdropFilter: "blur(20px) saturate(1.4)",
+        border: "1px solid rgba(255,255,255,0.07)",
+        /* Resting inner light + ambient violet glow */
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.05), 0 4px 24px rgba(0,0,0,0.3)",
+        transition: "border-color 220ms, box-shadow 240ms, transform 220ms cubic-bezier(0.16,1,0.3,1)",
+        ...style,
+      }}
+      onMouseEnter={hover ? (e) => { e.currentTarget.style.boxShadow = "inset 0 1px 0 rgba(255,255,255,0.09), 0 0 0 1px rgba(139,92,246,0.1), 0 8px 40px rgba(124,58,237,0.12), 0 4px 16px rgba(0,0,0,0.4)"; e.currentTarget.style.borderColor = "rgba(139,92,246,0.22)"; } : undefined}
+      onMouseLeave={hover ? (e) => { e.currentTarget.style.boxShadow = "inset 0 1px 0 rgba(255,255,255,0.05), 0 4px 24px rgba(0,0,0,0.3)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"; } : undefined}
+      onMouseMove={hover ? (e) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        setPos({ x: `${((e.clientX - r.left) / r.width) * 100}%`, y: `${((e.clientY - r.top) / r.height) * 100}%` });
+      } : undefined}
+    >
+      {/* Static top-edge light — always visible */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-px"
+        style={{ background: "linear-gradient(90deg, transparent 0%, rgba(139,92,246,0.45) 30%, rgba(34,211,238,0.32) 70%, transparent 100%)" }}
+      />
+      {/* Pointer-tracked spotlight */}
+      {hover && (
+        <div
+          className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+          style={{
+            background: `radial-gradient(400px circle at ${pos.x} ${pos.y}, rgba(139,92,246,0.08), transparent 60%)`,
+          }}
+        />
+      )}
+      {children}
+    </div>
+  );
+};
+
+/* ────────────────────────────────────────────────────────────────
+   CHAT MOCKUP (for AI section)
+──────────────────────────────────────────────────────────────── */
+const ChatMockup = () => (
+  <div className="space-y-3 p-4">
+    {[
+      { role: "user",   text: "Explique-moi le protocole TCP en 3 points clés" },
+      { role: "novaa",  text: "TCP garantit la livraison ordonnée des données via :\n1. Établissement de connexion (3-way handshake)\n2. Numérotation de séquence\n3. Accusé de réception (ACK)" },
+      { role: "user",   text: "Génère un quiz de 5 questions MCQ sur ce sujet" },
+    ].map((m, i) => (
+      <motion.div
+        key={i}
+        initial={{ opacity: 0, y: 10 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.4, delay: i * 0.15, ease }}
+        className={`flex gap-2 ${m.role === "user" ? "justify-end" : "justify-start"}`}
+      >
+        {m.role === "novaa" && (
+          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[8px] font-bold mt-0.5"
+            style={{ background: "rgba(124,58,237,0.3)", color: "#a78bfa", border: "1px solid rgba(124,58,237,0.4)" }}>N</div>
+        )}
+        <div
+          className="max-w-[80%] rounded-xl px-3 py-2"
+          style={{
+            background: m.role === "user"
+              ? "rgba(124,58,237,0.18)"
+              : "rgba(255,255,255,0.04)",
+            border: `1px solid ${m.role === "user" ? "rgba(124,58,237,0.3)" : "rgba(255,255,255,0.07)"}`,
+          }}
+        >
+          <p className="text-[11px] leading-relaxed whitespace-pre-line" style={{ color: m.role === "user" ? "#d8b4fe" : "rgba(200,200,220,0.85)" }}>
+            {m.text}
+          </p>
+        </div>
+      </motion.div>
+    ))}
+    <div className="flex gap-2 items-center px-3 py-2 rounded-xl"
+      style={{ background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.18)" }}>
+      <Sparkles className="h-3 w-3 text-violet-400 animate-pulse" />
+      <span className="text-[10px] font-mono" style={{ color: "rgba(139,92,246,0.7)" }}>Génération du quiz…</span>
+    </div>
+  </div>
+);
+
+/* ────────────────────────────────────────────────────────────────
+   MAIN
+──────────────────────────────────────────────────────────────── */
+export default function LandingPage() {
+  const containerRef = useRef(null);
+  const { scrollYProgress } = useScroll({ target: containerRef });
+  const rawHeroY = useTransform(scrollYProgress, [0, 0.2], [0, -50]);
+  const heroY    = useSpring(rawHeroY, { stiffness: 80, damping: 25, restDelta: 0.001 });
+
+  return (
+    <div ref={containerRef} className="relative min-h-screen overflow-x-hidden" style={{ background: "#030312", color: "#f0f0ff" }}>
+
+      {/* ── BACKGROUND ─────────────────────────────────────────── */}
+      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden>
+        <div className="absolute rounded-full animate-orb-1"
+          style={{ width: 900, height: 900, top: "-25%", left: "-20%",
+            background: "radial-gradient(circle at 40% 40%, rgba(124,58,237,0.42) 0%, rgba(124,58,237,0.1) 45%, transparent 70%)",
+            filter: "blur(60px)" }} />
+        <div className="absolute rounded-full animate-orb-2"
+          style={{ width: 700, height: 700, bottom: "-20%", right: "-15%",
+            background: "radial-gradient(circle, rgba(8,145,178,0.35) 0%, rgba(8,145,178,0.08) 45%, transparent 70%)",
+            filter: "blur(60px)" }} />
+        {/* Fine grid */}
+        <div className="absolute inset-0"
+          style={{
+            backgroundImage: "radial-gradient(circle, rgba(139,92,246,0.14) 1px, transparent 1px)",
+            backgroundSize: "32px 32px",
+            maskImage: "radial-gradient(ellipse 80% 80% at 50% 40%, black 0%, transparent 100%)",
+            WebkitMaskImage: "radial-gradient(ellipse 80% 80% at 50% 40%, black 0%, transparent 100%)",
+          }} />
+      </div>
 
       <div className="relative z-10">
 
-        {/* ── NAVBAR ──────────────────────────────────────────── */}
-        <header className="sticky top-0 z-50 px-4 pt-4 pb-2 md:px-8">
-          <nav
-            className="mx-auto flex max-w-5xl items-center justify-between rounded-[var(--radius-xl)] px-5 py-3"
+        {/* ════════════════════════════════════════════════════════
+            NAV
+        ════════════════════════════════════════════════════════ */}
+        <header className="sticky top-0 z-50 flex justify-center px-4 pt-4">
+          <motion.nav
+            initial={{ opacity: 0, y: -16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease }}
+            className="flex w-full max-w-5xl items-center justify-between rounded-2xl px-5 py-3"
             style={{
-              background: "rgba(7,7,13,0.88)",
-              backdropFilter: "blur(18px)",
-              border: "1px solid rgba(255,255,255,0.08)",
-              boxShadow: "0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)",
+              background: "rgba(3,3,18,0.82)",
+              backdropFilter: "blur(24px)",
+              border: "1px solid rgba(139,92,246,0.18)",
+              boxShadow: "0 4px 30px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)",
             }}
           >
+            {/* Logo */}
             <div className="flex items-center gap-2.5">
-              <div
-                className="flex h-8 w-8 items-center justify-center rounded-xl text-xs font-bold"
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl"
                 style={{
-                  background: "linear-gradient(135deg, rgba(124,58,237,0.4), rgba(8,145,178,0.3))",
-                  border: "1px solid rgba(124,58,237,0.4)",
-                  boxShadow: "0 0 14px rgba(124,58,237,0.25)",
-                  color: "#a78bfa",
-                }}
-              >
-                CE
+                  background: "linear-gradient(135deg, rgba(124,58,237,0.5), rgba(8,145,178,0.35))",
+                  border: "1px solid rgba(139,92,246,0.5)",
+                  boxShadow: "0 0 16px rgba(124,58,237,0.3)",
+                }}>
+                <Zap className="h-4 w-4" style={{ color: "#a78bfa", filter: "drop-shadow(0 0 4px #a78bfa)" }} />
               </div>
-              <span className="text-sm font-bold" style={{ color: "var(--text-1)" }}>
+              <span className="text-sm font-bold" style={{ letterSpacing: "-0.02em" }}>
                 Campus<span style={{ color: "#a78bfa" }}>Eye</span>
               </span>
             </div>
 
+            {/* Links */}
             <div className="hidden items-center gap-1 md:flex">
-              {[["Platform", "#features"], ["Roles", "#roles"], ["Preview", "#preview"]].map(([label, href]) => (
-                <a
-                  key={label}
-                  href={href}
-                  className="rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-150"
-                  style={{ color: "var(--text-3)" }}
-                  onMouseEnter={e => { e.currentTarget.style.color = "var(--text-1)"; e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.color = "var(--text-3)"; e.currentTarget.style.background = "transparent"; }}
-                >
-                  {label}
+              {[["Features","#features"],["Roles","#roles"],["AI","#ai"]].map(([l, h]) => (
+                <a key={l} href={h}
+                  className="rounded-xl px-3 py-1.5 text-sm font-medium transition-all duration-150"
+                  style={{ color: "rgba(120,120,160,0.9)" }}
+                  onMouseEnter={e => { e.currentTarget.style.color = "#f0f0ff"; e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.color = "rgba(120,120,160,0.9)"; e.currentTarget.style.background = "transparent"; }}>
+                  {l}
                 </a>
               ))}
             </div>
 
+            {/* CTA */}
             <Link to="/login">
               <button
-                className="btn text-sm font-semibold px-4 py-2"
+                className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold transition-all duration-150"
                 style={{
-                  background: "rgba(255,255,255,0.08)",
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  color: "var(--text-1)",
-                  borderRadius: "var(--radius)",
+                  background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
+                  color: "#fff",
+                  boxShadow: "0 0 20px rgba(124,58,237,0.35)",
                 }}
-                onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.13)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"; }}
-              >
-                Sign in →
+                onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 0 36px rgba(124,58,237,0.55)"; e.currentTarget.style.transform = "translateY(-1px)"; }}
+                onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 0 20px rgba(124,58,237,0.35)"; e.currentTarget.style.transform = "none"; }}>
+                Sign in <ArrowRight className="h-3.5 w-3.5" />
               </button>
             </Link>
-          </nav>
+          </motion.nav>
         </header>
 
-        {/* ── HERO ─────────────────────────────────────────────── */}
-        <section className="mx-auto max-w-5xl px-6 pb-20 pt-20 text-center md:pt-28">
-          <motion.div {...rise(0)}>
-            <Pill accent="#a78bfa">✦ AI-Powered Academic Platform</Pill>
-          </motion.div>
+        {/* ════════════════════════════════════════════════════════
+            HERO
+        ════════════════════════════════════════════════════════ */}
+        <section className="mx-auto max-w-6xl px-6 pt-20 pb-16 md:pt-28 md:pb-24">
+          <div className="flex flex-col items-center gap-16 lg:flex-row lg:items-center lg:gap-12">
 
-          <motion.h1
-            {...rise(0.07)}
-            className="mx-auto mt-8 max-w-3xl text-5xl font-bold leading-[1.06] tracking-[-0.04em] md:text-6xl lg:text-7xl"
-            style={{ color: "var(--text-1)" }}
-          >
-            The campus{" "}
-            <span
-              style={{
-                background: "linear-gradient(135deg, #a78bfa 0%, #22d3ee 50%, #f472b6 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-              }}
-            >
-              that thinks.
-            </span>
-          </motion.h1>
+            {/* Left */}
+            <motion.div className="flex-1 min-w-0" style={{ y: heroY }}>
+              <motion.div {...up(0)}>
+                <div className="mb-6 inline-flex items-center gap-2 rounded-full px-3 py-1.5"
+                  style={{ background: "rgba(124,58,237,0.12)", border: "1px solid rgba(124,58,237,0.28)" }}>
+                  <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-pulse" />
+                  <span className="text-xs font-semibold" style={{ color: "#a78bfa", letterSpacing: "0.04em" }}>
+                    PFE · EST · Moroccan Engineering Schools
+                  </span>
+                </div>
+              </motion.div>
 
-          <motion.p
-            {...rise(0.12)}
-            className="mx-auto mt-6 max-w-xl text-base leading-relaxed md:text-lg"
-            style={{ color: "var(--text-2)" }}
-          >
-            Face-scan attendance, AI tutoring, and full academic oversight — one unified platform for every role in your institution.
-          </motion.p>
-
-          <motion.div {...rise(0.16)} className="mt-10 flex flex-wrap items-center justify-center gap-3">
-            <Link to="/login">
-              <button
-                className="btn gap-2 px-7 py-3 text-sm font-bold"
+              <motion.h1 {...up(0.06)}
                 style={{
-                  background: "linear-gradient(135deg, #7c3aed, #0891b2)",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "var(--radius)",
-                  boxShadow: "0 0 30px rgba(124,58,237,0.35), 0 4px 16px rgba(0,0,0,0.3)",
-                }}
-                onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 0 50px rgba(124,58,237,0.5), 0 4px 20px rgba(0,0,0,0.4)"; e.currentTarget.style.transform = "translateY(-1px)"; }}
-                onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 0 30px rgba(124,58,237,0.35), 0 4px 16px rgba(0,0,0,0.3)"; e.currentTarget.style.transform = "none"; }}
-              >
-                Open platform <ArrowRight className="h-4 w-4" />
-              </button>
-            </Link>
-            <a href="#features">
-              <button className="btn-ghost gap-2 px-7 py-3 text-sm font-medium">
-                Explore features
-              </button>
-            </a>
-          </motion.div>
+                  fontSize: "clamp(2.8rem, 6vw, 5rem)",
+                  fontWeight: 780,
+                  letterSpacing: "-0.045em",
+                  lineHeight: 1.04,
+                  color: "#f0f0ff",
+                }}>
+                Attendance,
+                <br />
+                <span style={{
+                  background: "linear-gradient(135deg, #a78bfa 0%, #60a5fa 45%, #22d3ee 100%)",
+                  WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
+                }}>
+                  reimagined.
+                </span>
+              </motion.h1>
 
-          {/* Stats strip */}
-          <motion.div
-            {...rise(0.2)}
-            className="mx-auto mt-16 grid max-w-lg grid-cols-3 overflow-hidden rounded-[var(--radius-lg)]"
-            style={{ border: "1px solid rgba(255,255,255,0.07)", background: "var(--surface)" }}
-          >
-            {[
-              { val: "3 Roles", sub: "Student · Teacher · Admin" },
-              { val: "9 AI Agents", sub: "Specialist tutor modes" },
-              { val: "Live Scan", sub: "Face recognition" },
-            ].map(({ val, sub }, i) => (
-              <div
-                key={val}
-                className="px-5 py-4 text-center"
-                style={{ borderRight: i < 2 ? "1px solid rgba(255,255,255,0.06)" : "none" }}
-              >
-                <p className="text-sm font-bold" style={{ color: "var(--text-1)" }}>{val}</p>
-                <p className="mt-0.5 text-[11px]" style={{ color: "var(--text-3)" }}>{sub}</p>
-              </div>
-            ))}
-          </motion.div>
-        </section>
+              <motion.p {...up(0.1)}
+                className="mt-6 max-w-lg text-[16px] leading-[1.7]"
+                style={{ color: "rgba(120,120,160,0.9)" }}>
+                Face recognition that marks attendance in seconds. An AI tutor with 17 specialist agents.
+                A command center for every academic role — built for the modern Moroccan campus.
+              </motion.p>
 
-        <Sep />
+              <motion.div {...up(0.14)} className="mt-8 flex flex-wrap gap-3">
+                <Link to="/login">
+                  <button
+                    className="flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-bold transition-all duration-200"
+                    style={{
+                      background: "linear-gradient(135deg, #7c3aed 0%, #4f46e5 60%, #0891b2 100%)",
+                      color: "#fff",
+                      boxShadow: "0 0 40px rgba(124,58,237,0.4), 0 4px 20px rgba(0,0,0,0.4)",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 0 60px rgba(124,58,237,0.6), 0 4px 24px rgba(0,0,0,0.5)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 0 40px rgba(124,58,237,0.4), 0 4px 20px rgba(0,0,0,0.4)"; e.currentTarget.style.transform = "none"; }}>
+                    Get started <ArrowRight className="h-4 w-4" />
+                  </button>
+                </Link>
+                <a href="#features">
+                  <button
+                    className="flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-medium transition-all"
+                    style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(200,200,220,0.9)" }}
+                    onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.09)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.18)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}>
+                    See how it works
+                  </button>
+                </a>
+              </motion.div>
 
-        {/* ── FEATURES ─────────────────────────────────────────── */}
-        <section id="features" className="mx-auto max-w-5xl px-6 py-24">
-          <motion.div {...rise(0)} className="text-center mb-14">
-            <Pill accent="#22d3ee">Platform overview</Pill>
-            <h2 className="mx-auto mt-6 max-w-2xl text-3xl font-bold tracking-tight md:text-4xl" style={{ color: "var(--text-1)" }}>
-              Everything your institution needs.
-            </h2>
-            <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed" style={{ color: "var(--text-2)" }}>
-              From AI tutoring to live face-scan attendance — one platform built for every academic role.
-            </p>
-          </motion.div>
+              {/* Social proof strip */}
+              <motion.div {...up(0.18)} className="mt-10 flex items-center gap-4">
+                <div className="flex -space-x-2">
+                  {["#a78bfa","#22d3ee","#f472b6","#4ade80","#fbbf24"].map((c, i) => (
+                    <div key={i} className="flex h-7 w-7 items-center justify-center rounded-full border-2 text-[9px] font-bold"
+                      style={{ background: `${c}20`, borderColor: "#030312", color: c }}>
+                      {["A","T","S","T","S"][i]}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs" style={{ color: "rgba(120,120,160,0.8)" }}>
+                  Used by students, teachers & admins
+                </p>
+              </motion.div>
+            </motion.div>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              {
-                icon: Sparkles, title: "AI Tutoring",
-                text: "9 specialist agents: Q&A, quizzes, code, summaries, flashcards and more.",
-                accent: "#a78bfa", glow: "rgba(124,58,237,0.12)",
-              },
-              {
-                icon: Camera, title: "Face Attendance",
-                text: "Webcam scans auto-recognize enrolled students every 2 seconds — zero manual entry.",
-                accent: "#22d3ee", glow: "rgba(8,145,178,0.12)",
-              },
-              {
-                icon: BarChart3, title: "Progress Clarity",
-                text: "Students see attendance rates, at-risk alerts, and course progress in one view.",
-                accent: "#4ade80", glow: "rgba(21,128,61,0.12)",
-              },
-              {
-                icon: ShieldCheck, title: "Full Oversight",
-                text: "Admins manage departments, filieres, courses, and users from one dashboard.",
-                accent: "#f472b6", glow: "rgba(190,24,93,0.12)",
-              },
-            ].map((f, i) => {
-              const Icon = f.icon;
-              return (
-                <motion.div
-                  key={f.title}
-                  {...rise(0.06 * i)}
-                  className="group relative overflow-hidden rounded-[var(--radius-lg)] p-6 transition-all duration-300"
-                  style={{ border: `1px solid ${f.accent}25`, background: f.glow }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = `${f.accent}50`; e.currentTarget.style.boxShadow = `0 8px 32px ${f.glow}`; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = `${f.accent}25`; e.currentTarget.style.boxShadow = "none"; }}
-                >
-                  <div className="absolute inset-x-0 top-0 h-px"
-                       style={{ background: `linear-gradient(90deg, transparent, ${f.accent}60, transparent)` }} />
-                  <div
-                    className="flex h-10 w-10 items-center justify-center rounded-[var(--radius)] transition-transform duration-200 group-hover:scale-110"
-                    style={{ background: `${f.accent}20`, border: `1px solid ${f.accent}30` }}
-                  >
-                    <Icon className="h-5 w-5" style={{ color: f.accent, filter: `drop-shadow(0 0 6px ${f.accent})` }} />
-                  </div>
-                  <h3 className="mt-4 text-sm font-bold" style={{ color: "var(--text-1)" }}>{f.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--text-2)" }}>{f.text}</p>
-                </motion.div>
-              );
-            })}
+            {/* Right — terminal mockup */}
+            <motion.div
+              className="w-full lg:w-[48%] shrink-0"
+              initial={{ opacity: 0, x: 40, scale: 0.97 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              transition={{ duration: 0.8, delay: 0.2, ease }}
+            >
+              <TerminalMockup />
+            </motion.div>
           </div>
         </section>
 
-        <Sep />
+        {/* ── STATS TICKER ───────────────────────────────────────── */}
+        <div className="mx-auto mb-20 max-w-5xl px-6">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            {[
+              { val: "3",  unit: "Roles",     desc: "Student · Teacher · Admin", color: "#a78bfa" },
+              { val: "17", unit: "AI Agents",  desc: "Specialist tutor modes",    color: "#22d3ee" },
+              { val: "<2s",unit: "Face Scan",  desc: "Per recognition scan",      color: "#4ade80" },
+              { val: "∞",  unit: "Materials",  desc: "Upload PDFs, slides & more",color: "#fbbf24" },
+            ].map(({ val, unit, desc, color }, i) => (
+              <motion.div
+                key={unit}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{ duration: 0.55, delay: i * 0.07, ease: [0.16, 1, 0.3, 1] }}
+                className="rounded-2xl p-5"
+                style={{
+                  background: "rgba(6,6,20,0.75)",
+                  backdropFilter: "blur(16px) saturate(1.3)",
+                  WebkitBackdropFilter: "blur(16px) saturate(1.3)",
+                  border: `1px solid ${color}18`,
+                  boxShadow: `inset 0 1px 0 rgba(255,255,255,0.05), 0 4px 20px rgba(0,0,0,0.25)`,
+                  transition: "border-color 220ms, box-shadow 220ms",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = `${color}40`; e.currentTarget.style.boxShadow = `inset 0 1px 0 rgba(255,255,255,0.08), 0 0 24px ${color}20, 0 4px 20px rgba(0,0,0,0.3)`; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = `${color}18`; e.currentTarget.style.boxShadow = `inset 0 1px 0 rgba(255,255,255,0.05), 0 4px 20px rgba(0,0,0,0.25)`; }}
+              >
+                <div className="flex items-baseline gap-1.5">
+                  <span style={{ fontSize: "1.9rem", fontWeight: 750, letterSpacing: "-0.04em", color, lineHeight: 1, textShadow: `0 0 20px ${color}55` }}>{val}</span>
+                  <span className="text-xs font-bold" style={{ color, opacity: 0.7, letterSpacing: "0.04em" }}>{unit}</span>
+                </div>
+                <p className="mt-1.5 text-[11px]" style={{ color: "rgba(100,100,130,0.85)" }}>{desc}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
 
-        {/* ── ROLES ────────────────────────────────────────────── */}
-        <section id="roles" className="mx-auto max-w-5xl px-6 py-24">
-          <motion.div {...rise(0)} className="text-center mb-14">
-            <Pill accent="#f472b6">Built for every role</Pill>
-            <h2 className="mt-6 text-3xl font-bold tracking-tight md:text-4xl" style={{ color: "var(--text-1)" }}>
+        {/* ════════════════════════════════════════════════════════
+            BENTO FEATURES
+        ════════════════════════════════════════════════════════ */}
+        <section id="features" className="mx-auto max-w-5xl px-6 pb-24">
+          <div className="mb-12">
+            <motion.p
+              initial={{ opacity: 0, y: 12 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.3 }}
+              transition={{ duration: 0.5, delay: 0, ease: [0.16, 1, 0.3, 1] }}
+              className="text-xs font-bold uppercase tracking-[0.12em]"
+              style={{ color: "rgba(139,92,246,0.7)" }}
+            >
+              Platform
+            </motion.p>
+            <motion.h2
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.3 }}
+              transition={{ duration: 0.6, delay: 0.04, ease: [0.16, 1, 0.3, 1] }}
+              style={{ fontSize: "clamp(1.8rem, 4vw, 2.8rem)", fontWeight: 750, letterSpacing: "-0.04em", marginTop: "0.5rem", lineHeight: 1.1 }}
+            >
+              Everything your institution needs.
+            </motion.h2>
+          </div>
+
+          {/* Bento grid — 3 columns */}
+          <div className="grid gap-3 md:grid-cols-3">
+
+            {/* Large: Face scan — spans 2 rows on large */}
+            <motion.div {...up(0.04)} className="md:row-span-2">
+              <BentoCard className="h-full p-6" style={{ minHeight: 340 }}>
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl mb-5"
+                  style={{ background: "rgba(8,145,178,0.15)", border: "1px solid rgba(8,145,178,0.3)" }}>
+                  <ScanLine className="h-6 w-6" style={{ color: "#22d3ee", filter: "drop-shadow(0 0 6px #22d3ee)" }} />
+                </div>
+                <h3 style={{ fontSize: "1.2rem", fontWeight: 700, letterSpacing: "-0.025em", color: "#f0f0ff" }}>
+                  Face Scan Attendance
+                </h3>
+                <p className="mt-2 text-sm leading-relaxed" style={{ color: "rgba(120,120,160,0.85)" }}>
+                  Webcam-powered face recognition marks attendance automatically. Zero manual entry, zero error.
+                </p>
+                <div className="mt-6 space-y-2">
+                  {["~98% recognition accuracy","Marks present in under 2 seconds","Works with webcam or upload"].map(f => (
+                    <div key={f} className="flex items-center gap-2 text-xs" style={{ color: "rgba(150,150,180,0.8)" }}>
+                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color: "#22d3ee" }} />
+                      {f}
+                    </div>
+                  ))}
+                </div>
+                {/* Mini visual */}
+                <div className="mt-6 rounded-xl p-3"
+                  style={{ background: "rgba(8,145,178,0.06)", border: "1px solid rgba(8,145,178,0.15)" }}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-mono" style={{ color: "rgba(34,211,238,0.6)" }}>FACE_ID_SCAN.py</span>
+                    <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
+                  </div>
+                  <div className="space-y-1">
+                    {["> scan_frame(cap.read())", "> match_face(encoding, db)", '✓ "Sara Benali" → PRESENT'].map((l, i) => (
+                      <p key={i} className="font-mono text-[10px]"
+                        style={{ color: i === 2 ? "#4ade80" : "rgba(120,120,160,0.7)" }}>{l}</p>
+                    ))}
+                  </div>
+                </div>
+              </BentoCard>
+            </motion.div>
+
+            {/* AI Tutor */}
+            <motion.div {...up(0.08)}>
+              <BentoCard className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl"
+                    style={{ background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.3)" }}>
+                    <Brain className="h-5 w-5" style={{ color: "#a78bfa", filter: "drop-shadow(0 0 5px #a78bfa)" }} />
+                  </div>
+                  <span className="rounded-full px-2.5 py-1 text-[10px] font-bold"
+                    style={{ background: "rgba(124,58,237,0.12)", color: "#a78bfa", border: "1px solid rgba(124,58,237,0.25)" }}>
+                    17 agents
+                  </span>
+                </div>
+                <h3 style={{ fontSize: "1.1rem", fontWeight: 700, letterSpacing: "-0.02em", color: "#f0f0ff" }}>NOVAA AI Tutor</h3>
+                <p className="mt-2 text-sm leading-relaxed" style={{ color: "rgba(120,120,160,0.85)" }}>
+                  Quizzes, flashcards, code help, summaries, study plans — all from course materials.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-1.5">
+                  {["Quiz","Flashcard","Code","Summary","Exam Prep"].map(t => (
+                    <span key={t} className="rounded-lg px-2 py-1 text-[10px] font-medium"
+                      style={{ background: "rgba(124,58,237,0.1)", color: "rgba(167,139,250,0.8)", border: "1px solid rgba(124,58,237,0.18)" }}>
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              </BentoCard>
+            </motion.div>
+
+            {/* Admin oversight */}
+            <motion.div {...up(0.1)}>
+              <BentoCard className="p-6">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl mb-4"
+                  style={{ background: "rgba(190,24,93,0.15)", border: "1px solid rgba(190,24,93,0.3)" }}>
+                  <ShieldCheck className="h-5 w-5" style={{ color: "#f472b6", filter: "drop-shadow(0 0 5px #f472b6)" }} />
+                </div>
+                <h3 style={{ fontSize: "1.1rem", fontWeight: 700, letterSpacing: "-0.02em", color: "#f0f0ff" }}>Full Oversight</h3>
+                <p className="mt-2 text-sm leading-relaxed" style={{ color: "rgba(120,120,160,0.85)" }}>
+                  Admins manage departments, filières, courses, users, and face registration requests from one panel.
+                </p>
+              </BentoCard>
+            </motion.div>
+
+            {/* Attendance analytics — spans 2 cols */}
+            <motion.div {...up(0.12)} className="md:col-span-2">
+              <BentoCard className="p-6">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl mb-4"
+                      style={{ background: "rgba(74,222,128,0.12)", border: "1px solid rgba(74,222,128,0.25)" }}>
+                      <BarChart3 className="h-5 w-5" style={{ color: "#4ade80" }} />
+                    </div>
+                    <h3 style={{ fontSize: "1.1rem", fontWeight: 700, letterSpacing: "-0.02em", color: "#f0f0ff" }}>Live Analytics</h3>
+                    <p className="mt-2 text-sm" style={{ color: "rgba(120,120,160,0.85)" }}>
+                      Real-time attendance rates, danger-zone alerts, and course breakdowns.
+                    </p>
+                  </div>
+                  {/* Mini bar chart */}
+                  <div className="hidden md:flex items-end gap-1.5 h-16">
+                    {[40,65,55,80,72,90,68].map((h, i) => (
+                      <div key={i} className="w-4 rounded-t-sm transition-all"
+                        style={{
+                          height: `${h}%`,
+                          background: `linear-gradient(180deg, ${i === 5 ? "#4ade80" : "rgba(74,222,128,0.35)"}, ${i === 5 ? "rgba(74,222,128,0.3)" : "rgba(74,222,128,0.1)"})`,
+                          border: i === 5 ? "1px solid rgba(74,222,128,0.5)" : "1px solid rgba(74,222,128,0.15)",
+                        }} />
+                    ))}
+                  </div>
+                </div>
+              </BentoCard>
+            </motion.div>
+
+          </div>
+        </section>
+
+        {/* ════════════════════════════════════════════════════════
+            ROLES
+        ════════════════════════════════════════════════════════ */}
+        <section id="roles" className="mx-auto max-w-5xl px-6 pb-24">
+          <div className="mb-12">
+            <motion.p
+              initial={{ opacity: 0, y: 12 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.3 }}
+              transition={{ duration: 0.5, delay: 0, ease: [0.16, 1, 0.3, 1] }}
+              className="text-xs font-bold uppercase tracking-[0.12em]"
+              style={{ color: "rgba(244,114,182,0.7)" }}
+            >
+              Roles
+            </motion.p>
+            <motion.h2
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.3 }}
+              transition={{ duration: 0.6, delay: 0.04, ease: [0.16, 1, 0.3, 1] }}
+              style={{ fontSize: "clamp(1.8rem, 4vw, 2.8rem)", fontWeight: 750, letterSpacing: "-0.04em", marginTop: "0.5rem", lineHeight: 1.1 }}
+            >
               One platform, three experiences.
-            </h2>
-          </motion.div>
+            </motion.h2>
+          </div>
 
-          <div className="grid gap-5 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-3">
             {[
               {
-                role: "Students", letter: "S",
-                accent: "#a78bfa", glow: "rgba(124,58,237,0.1)",
-                items: ["Ask the AI tutor anything", "Track attendance & at-risk status", "View course materials & resources"],
-                stats: [{ l: "Progress", v: "82%" }, { l: "Score", v: "91%" }, { l: "Level", v: "High" }],
+                role: "Student",
+                color: "#a78bfa", border: "rgba(124,58,237,0.2)", bg: "rgba(124,58,237,0.06)",
+                icon: "S",
+                features: [
+                  "AI tutor (17 specialist agents)",
+                  "Live attendance tracking",
+                  "Absence danger-zone alerts",
+                  "Course materials & resources",
+                  "Exam prediction engine",
+                  "Pomodoro study planner",
+                ],
               },
               {
-                role: "Teachers", letter: "T",
-                accent: "#22d3ee", glow: "rgba(8,145,178,0.1)",
-                items: ["Live face-scan attendance", "Upload & manage materials", "Danger-zone email alerts"],
-                stats: [{ l: "Students", v: "34" }, { l: "At-risk", v: "07" }, { l: "Materials", v: "12" }],
+                role: "Teacher",
+                color: "#22d3ee", border: "rgba(8,145,178,0.2)", bg: "rgba(8,145,178,0.06)",
+                icon: "T",
+                features: [
+                  "One-click face scan sessions",
+                  "Manual attendance override",
+                  "Danger-zone email alerts",
+                  "Course material uploads",
+                  "NOVAA schedule assistant",
+                  "Attendance reports (XLSX)",
+                ],
               },
               {
-                role: "Admins", letter: "A",
-                accent: "#f472b6", glow: "rgba(190,24,93,0.1)",
-                items: ["Manage depts & filieres", "User creation & role control", "Platform-wide reporting"],
-                stats: [{ l: "Departments", v: "04" }, { l: "Filieres", v: "08" }, { l: "Uptime", v: "98%" }],
+                role: "Admin",
+                color: "#f472b6", border: "rgba(190,24,93,0.2)", bg: "rgba(190,24,93,0.06)",
+                icon: "A",
+                features: [
+                  "Platform-wide user management",
+                  "Department & filière structure",
+                  "Face registration approvals",
+                  "Bulk CSV user import",
+                  "NOVAA admin assistant",
+                  "Platform analytics & reports",
+                ],
               },
-            ].map((r, i) => (
-              <motion.div
-                key={r.role}
-                {...rise(0.08 * i)}
-                className="group relative overflow-hidden rounded-[var(--radius-xl)] p-6 transition-all duration-300"
-                style={{ border: `1px solid ${r.accent}25`, background: r.glow }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = `${r.accent}50`; e.currentTarget.style.boxShadow = `0 12px 40px ${r.glow}`; e.currentTarget.style.transform = "translateY(-2px)"; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = `${r.accent}25`; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.transform = "none"; }}
-              >
-                <div className="absolute inset-x-0 top-0 h-0.5"
-                     style={{ background: `linear-gradient(90deg, transparent, ${r.accent}80, transparent)` }} />
-                <div className="absolute right-4 top-4 h-24 w-24 rounded-full pointer-events-none"
-                     style={{ background: `radial-gradient(circle, ${r.accent}20, transparent 70%)` }} />
-
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl text-sm font-bold"
-                     style={{ background: `${r.accent}25`, border: `1px solid ${r.accent}40`, color: r.accent, boxShadow: `0 0 14px ${r.accent}30` }}>
-                  {r.letter}
-                </div>
-                <h3 className="mt-4 text-lg font-bold" style={{ color: r.accent }}>{r.role}</h3>
-
-                <div className="mt-3 space-y-2">
-                  {r.items.map(item => (
-                    <div key={item} className="flex items-center gap-2 text-sm" style={{ color: "var(--text-2)" }}>
-                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color: r.accent }} />
-                      {item}
+            ].map(({ role, color, border, bg, icon, features }, ri) => (
+              <motion.div key={role} {...up(0.06 * ri)}>
+                <BentoCard className="p-6 h-full" style={{ border: `1px solid ${border}`, background: bg }}>
+                  {/* Header */}
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl text-sm font-bold"
+                      style={{ background: `${color}20`, border: `1px solid ${color}35`, color }}>
+                      {icon}
                     </div>
-                  ))}
-                </div>
-
-                <div className="mt-5 grid grid-cols-3 gap-2">
-                  {r.stats.map(({ l, v }) => (
-                    <div key={l} className="rounded-[var(--radius)] p-2.5 text-center"
-                         style={{ background: "rgba(0,0,0,0.3)", border: `1px solid ${r.accent}20` }}>
-                      <p className="text-sm font-bold" style={{ color: r.accent }}>{v}</p>
-                      <p className="mt-0.5 text-[10px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>{l}</p>
+                    <div>
+                      <p className="text-sm font-bold" style={{ color: "#f0f0ff" }}>{role}</p>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: color }} />
+                        <span className="text-[10px]" style={{ color: `${color}80` }}>Active role</span>
+                      </div>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                  {/* Features */}
+                  <ul className="space-y-2.5">
+                    {features.map(f => (
+                      <li key={f} className="flex items-start gap-2.5 text-xs" style={{ color: "rgba(160,160,190,0.85)" }}>
+                        <ChevronRight className="h-3.5 w-3.5 shrink-0 mt-0.5" style={{ color }} />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                  {/* CTA */}
+                  <Link to="/login">
+                    <button
+                      className="mt-6 w-full rounded-xl py-2 text-xs font-semibold transition-all"
+                      style={{
+                        background: `${color}12`,
+                        border: `1px solid ${color}28`,
+                        color,
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = `${color}22`; e.currentTarget.style.borderColor = `${color}50`; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = `${color}12`; e.currentTarget.style.borderColor = `${color}28`; }}>
+                      Sign in as {role} →
+                    </button>
+                  </Link>
+                </BentoCard>
               </motion.div>
             ))}
           </div>
         </section>
 
-        <Sep />
+        {/* ════════════════════════════════════════════════════════
+            NOVAA AI SECTION
+        ════════════════════════════════════════════════════════ */}
+        <section id="ai" className="mx-auto max-w-5xl px-6 pb-24">
+          <motion.div {...up(0)}>
+            <BentoCard className="overflow-hidden" style={{ border: "1px solid rgba(124,58,237,0.25)", background: "rgba(4,4,16,0.9)" }}>
+              {/* Top stripe */}
+              <div className="h-px w-full" style={{ background: "linear-gradient(90deg, transparent, rgba(124,58,237,0.6), rgba(34,211,238,0.4), transparent)" }} />
 
-        {/* ── AI TUTOR SHOWCASE ─────────────────────────────────── */}
-        <section id="preview" className="mx-auto max-w-5xl px-6 py-24">
-          <motion.div {...rise(0)} className="overflow-hidden rounded-[var(--radius-xl)]"
-                      style={{ border: "1px solid rgba(124,58,237,0.2)", background: "rgba(124,58,237,0.04)", boxShadow: "0 0 60px rgba(124,58,237,0.06)" }}>
-            <div className="grid xl:grid-cols-2">
-              <div className="p-8 xl:p-10 xl:border-r" style={{ borderColor: "rgba(124,58,237,0.15)" }}>
-                <Pill accent="#a78bfa">AI Tutoring</Pill>
-                <h2 className="mt-5 text-2xl font-bold tracking-tight md:text-3xl" style={{ color: "var(--text-1)" }}>
-                  Academic help built{" "}
-                  <span style={{ color: "#a78bfa" }}>into the platform.</span>
-                </h2>
-                <p className="mt-3 text-sm leading-relaxed" style={{ color: "var(--text-2)" }}>
-                  Students get context-aware answers, lesson summaries, and revision support without leaving their course.
-                </p>
-                <div className="mt-6 space-y-2.5">
-                  {[
-                    "Context-aware answers from course materials",
-                    "Instant lesson summaries on demand",
-                    "Auto-generated quizzes & flashcards",
-                    "File upload — ask about your own PDFs",
-                  ].map(f => (
-                    <div key={f} className="flex items-center gap-2.5 text-sm" style={{ color: "var(--text-2)" }}>
-                      <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: "#a78bfa", filter: "drop-shadow(0 0 4px #a78bfa)" }} />
-                      {f}
-                    </div>
-                  ))}
-                </div>
-                <Link to="/login">
-                  <button className="btn-violet mt-8 gap-2 px-5 py-2.5 text-sm font-semibold">
-                    Try the AI tutor <ArrowRight className="h-4 w-4" />
-                  </button>
-                </Link>
-              </div>
-
-              {/* Chat mockup */}
-              <div className="p-8 xl:p-10">
-                <div className="rounded-[var(--radius-lg)] overflow-hidden" style={{ background: "var(--bg)", border: "1px solid rgba(255,255,255,0.07)" }}>
-                  <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", background: "rgba(124,58,237,0.06)" }}>
-                    <div className="flex items-center gap-2.5">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ background: "rgba(124,58,237,0.2)", boxShadow: "0 0 10px rgba(124,58,237,0.3)" }}>
-                        <Sparkles className="h-3.5 w-3.5" style={{ color: "#a78bfa" }} />
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold" style={{ color: "var(--text-1)" }}>AI Tutor</p>
-                        <p className="text-[10px]" style={{ color: "var(--text-3)" }}>Connected to course</p>
-                      </div>
-                    </div>
-                    <span className="badge badge-green"><span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" /> Online</span>
+              <div className="grid gap-8 p-8 md:grid-cols-2 md:items-center">
+                {/* Left text — slides in from left */}
+                <motion.div
+                  initial={{ opacity: 0, x: -24 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true, amount: 0.2 }}
+                  transition={{ duration: 0.65, delay: 0.04, ease: [0.16, 1, 0.3, 1] }}
+                >
+                  <div className="mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1.5"
+                    style={{ background: "rgba(124,58,237,0.1)", border: "1px solid rgba(124,58,237,0.25)" }}>
+                    <Sparkles className="h-3.5 w-3.5" style={{ color: "#a78bfa" }} />
+                    <span className="text-xs font-bold" style={{ color: "#a78bfa", letterSpacing: "0.05em" }}>NOVAA · AI Tutor</span>
                   </div>
 
-                  <div className="space-y-3 p-4">
-                    {[
-                      { side: "user", text: "Explain backpropagation simply." },
-                      { side: "ai",   text: "Neural networks learn by adjusting weights based on prediction errors — that adjustment process is backpropagation." },
-                      { side: "user", text: "Give me 3 quiz questions on this." },
-                      { side: "ai",   text: "Sure! Q1: What does backpropagation compute? Q2: What optimizer uses it? Q3: Name the chain rule's role..." },
-                    ].map((m, i) => (
-                      <div key={i} className={`flex ${m.side === "user" ? "justify-end" : "justify-start"}`}>
-                        <div
-                          className={`max-w-[78%] rounded-xl px-3.5 py-2.5 text-xs leading-relaxed ${m.side === "user" ? "rounded-tr-sm" : "rounded-tl-sm"}`}
-                          style={
-                            m.side === "user"
-                              ? { background: "linear-gradient(135deg, #7c3aed, #0891b2)", color: "white" }
-                              : { background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text-2)" }
-                          }
-                        >
-                          {m.text}
-                        </div>
-                      </div>
+                  <h2 style={{ fontSize: "clamp(1.6rem, 3.5vw, 2.4rem)", fontWeight: 750, letterSpacing: "-0.04em", lineHeight: 1.1 }}>
+                    Your personal academic
+                    {" "}<span style={{
+                      background: "linear-gradient(135deg, #a78bfa, #22d3ee)",
+                      WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
+                    }}>intelligence.</span>
+                  </h2>
+
+                  <p className="mt-4 text-sm leading-relaxed" style={{ color: "rgba(120,120,160,0.9)" }}>
+                    17 specialist AI agents that understand your course materials, generate quizzes, explain concepts,
+                    debug code, and build personalised study plans — all in French, English, or Darija.
+                  </p>
+
+                  <div className="mt-6 flex flex-wrap gap-2">
+                    {["Quiz Gen","Flashcards","Code Debug","Study Plan","Exam Predict","Translate","Research","Hints"].map(t => (
+                      <span key={t} className="rounded-lg px-2.5 py-1 text-[11px] font-semibold"
+                        style={{ background: "rgba(124,58,237,0.1)", color: "rgba(167,139,250,0.85)", border: "1px solid rgba(124,58,237,0.2)" }}>
+                        {t}
+                      </span>
                     ))}
                   </div>
+                </motion.div>
 
-                  <div className="mx-4 mb-4 flex items-center gap-2 rounded-[var(--radius)] px-3 py-2.5"
-                       style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
-                    <input readOnly placeholder="Ask anything about your course…"
-                           className="w-full bg-transparent text-xs outline-none" style={{ color: "var(--text-3)" }} />
-                    <ArrowRight className="h-3.5 w-3.5 shrink-0 text-violet-400" />
+                {/* Right — chat mockup, rises up slightly behind the text */}
+                <motion.div
+                  initial={{ opacity: 0, y: 24 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.2 }}
+                  transition={{ duration: 0.7, delay: 0.12, ease: [0.16, 1, 0.3, 1] }}
+                  className="rounded-2xl overflow-hidden"
+                  style={{ background: "rgba(3,3,12,0.8)", border: "1px solid rgba(124,58,237,0.15)" }}
+                >
+                  <div className="px-4 py-3 flex items-center gap-2"
+                    style={{ borderBottom: "1px solid rgba(124,58,237,0.12)", background: "rgba(124,58,237,0.06)" }}>
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full text-[8px] font-bold"
+                      style={{ background: "rgba(124,58,237,0.3)", color: "#a78bfa", border: "1px solid rgba(124,58,237,0.4)" }}>N</div>
+                    <span className="text-xs font-bold" style={{ color: "#a78bfa", letterSpacing: "-0.01em" }}>NOVAA</span>
+                    <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse ml-auto" />
                   </div>
-                </div>
+                  <ChatMockup />
+                </motion.div>
               </div>
-            </div>
+            </BentoCard>
           </motion.div>
         </section>
 
-        <Sep />
-
-        {/* ── FACE SCAN SHOWCASE ───────────────────────────────── */}
-        <section className="mx-auto max-w-5xl px-6 py-24">
-          <motion.div {...rise(0)} className="overflow-hidden rounded-[var(--radius-xl)]"
-                      style={{ border: "1px solid rgba(8,145,178,0.2)", background: "rgba(8,145,178,0.03)", boxShadow: "0 0 60px rgba(8,145,178,0.05)" }}>
-            <div className="grid xl:grid-cols-[1.1fr_0.9fr]">
-              <div className="p-8 xl:p-10 xl:border-r" style={{ borderColor: "rgba(8,145,178,0.15)" }}>
-                <Pill accent="#22d3ee">Face Recognition Attendance</Pill>
-                <h2 className="mt-5 text-2xl font-bold tracking-tight md:text-3xl" style={{ color: "var(--text-1)" }}>
-                  Attendance that{" "}
-                  <span style={{ color: "#22d3ee" }}>marks itself.</span>
-                </h2>
-                <p className="mt-3 text-sm leading-relaxed" style={{ color: "var(--text-2)" }}>
-                  Teachers open a live camera scan and the system automatically recognizes enrolled students — no manual entry needed.
-                </p>
-                <div className="mt-6 space-y-2.5">
-                  {[
-                    { icon: Brain,      text: "Face recognition via webcam" },
-                    { icon: Zap,        text: "Auto-scan every 2 seconds" },
-                    { icon: BarChart3,  text: "Results logged automatically" },
-                    { icon: TrendingUp, text: "Email alerts on danger threshold" },
-                  ].map(({ icon: Icon, text }) => (
-                    <div key={text} className="flex items-center gap-2.5 text-sm" style={{ color: "var(--text-2)" }}>
-                      <Icon className="h-4 w-4 shrink-0" style={{ color: "#22d3ee", filter: "drop-shadow(0 0 4px #22d3ee)" }} />
-                      {text}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Scan mockup */}
-              <div className="p-8 xl:p-10">
-                <div className="rounded-[var(--radius-lg)] overflow-hidden" style={{ background: "var(--bg)", border: "1px solid rgba(255,255,255,0.07)" }}>
-                  <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", background: "rgba(8,145,178,0.06)" }}>
-                    <div className="flex items-center gap-2">
-                      <ScanLine className="h-4 w-4" style={{ color: "#22d3ee" }} />
-                      <p className="text-xs font-semibold" style={{ color: "var(--text-1)" }}>Live Scan</p>
-                    </div>
-                    <span className="badge badge-amber"><span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" /> Scanning</span>
-                  </div>
-
-                  <div className="p-4">
-                    <div className="relative flex aspect-video items-center justify-center rounded-[var(--radius)] mb-4 overflow-hidden"
-                         style={{ background: "rgba(0,0,0,0.5)", border: "1px solid rgba(8,145,178,0.2)" }}>
-                      <div className="absolute inset-x-0 h-0.5 bg-cyan-400/40 animate-pulse" style={{ animation: "scan-line 2s linear infinite" }} />
-                      <div className="relative flex flex-col items-center justify-center gap-2">
-                        <div className="h-16 w-12 rounded-full border-2 border-dashed border-cyan-400/60 animate-pulse" />
-                        <p className="text-[10px] font-medium" style={{ color: "#22d3ee" }}>Detecting faces…</p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      {[
-                        { name: "Ahmed Benali",  s: "PRESENT", cls: "badge-green" },
-                        { name: "Fatima Zahra",  s: "PRESENT", cls: "badge-green" },
-                        { name: "Omar Idrissi",  s: "ABSENT",  cls: "badge-red"   },
-                      ].map(({ name, s, cls }) => (
-                        <div key={name} className="flex items-center justify-between rounded-[var(--radius-sm)] px-3 py-2"
-                             style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-                          <span className="text-xs font-medium" style={{ color: "var(--text-2)" }}>{name}</span>
-                          <span className={`badge ${cls}`}>{s}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </section>
-
-        <Sep />
-
-        {/* ── CTA ──────────────────────────────────────────────── */}
-        <section className="mx-auto max-w-5xl px-6 pb-28 pt-8 md:pb-36">
-          <motion.div
-            {...rise(0)}
-            className="relative overflow-hidden rounded-[var(--radius-xl)] px-8 py-20 text-center md:py-24"
-            style={{ border: "1px solid rgba(255,255,255,0.08)", background: "var(--surface)" }}
-          >
-            {/* Background glow */}
-            <div className="pointer-events-none absolute inset-0"
-                 style={{ background: "radial-gradient(ellipse 80% 60% at 50% 100%, rgba(124,58,237,0.1), transparent)" }} />
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px"
-                 style={{ background: "linear-gradient(90deg, transparent, rgba(124,58,237,0.4) 30%, rgba(8,145,178,0.4) 70%, transparent)" }} />
-
-            <div className="relative">
-              <Pill accent="#a78bfa">Get started today</Pill>
-              <h2 className="mx-auto mt-6 max-w-2xl text-3xl font-bold tracking-tight md:text-5xl" style={{ color: "var(--text-1)" }}>
-                Your academic workspace{" "}
+        {/* ════════════════════════════════════════════════════════
+            FINAL CTA
+        ════════════════════════════════════════════════════════ */}
+        <section className="mx-auto max-w-5xl px-6 pb-24">
+          <motion.div {...up(0)}>
+            <BentoCard className="p-12 text-center" style={{ border: "1px solid rgba(139,92,246,0.2)" }}>
+              <div className="h-px mb-8 mx-auto max-w-xs" style={{ background: "linear-gradient(90deg, transparent, rgba(139,92,246,0.5), transparent)" }} />
+              <h2 style={{ fontSize: "clamp(2rem, 5vw, 3.5rem)", fontWeight: 780, letterSpacing: "-0.045em", lineHeight: 1.06 }}>
+                Ready to transform<br />
                 <span style={{
-                  background: "linear-gradient(135deg, #a78bfa, #22d3ee)",
+                  background: "linear-gradient(135deg, #a78bfa 0%, #22d3ee 60%)",
                   WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
-                }}>is ready.</span>
+                }}>your campus?</span>
               </h2>
-              <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed" style={{ color: "var(--text-2)" }}>
-                Sign in to access your role-based dashboard — whether you're a student, teacher, or administrator.
+              <p className="mx-auto mt-5 max-w-md text-sm leading-relaxed" style={{ color: "rgba(120,120,160,0.85)" }}>
+                Join the platform built for Moroccan engineering education.
+                Face attendance, AI tutoring, and full academic oversight — all in one place.
               </p>
-              <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
                 <Link to="/login">
                   <button
-                    className="btn gap-2 px-8 py-3.5 text-sm font-bold"
+                    className="flex items-center gap-2 rounded-xl px-8 py-3.5 text-base font-bold transition-all"
                     style={{
-                      background: "linear-gradient(135deg, #7c3aed, #0891b2)",
-                      color: "white",
-                      border: "none",
-                      borderRadius: "var(--radius)",
-                      boxShadow: "0 0 40px rgba(124,58,237,0.4), 0 4px 20px rgba(0,0,0,0.3)",
+                      background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
+                      color: "#fff",
+                      boxShadow: "0 0 40px rgba(124,58,237,0.4)",
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 0 60px rgba(124,58,237,0.55), 0 4px 24px rgba(0,0,0,0.4)"; e.currentTarget.style.transform = "translateY(-1px)"; }}
-                    onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 0 40px rgba(124,58,237,0.4), 0 4px 20px rgba(0,0,0,0.3)"; e.currentTarget.style.transform = "none"; }}
-                  >
-                    Sign in to platform <ArrowRight className="h-4 w-4" />
+                    onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 0 60px rgba(124,58,237,0.6)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 0 40px rgba(124,58,237,0.4)"; e.currentTarget.style.transform = "none"; }}>
+                    Open platform <ArrowRight className="h-4 w-4" />
                   </button>
                 </Link>
-                <a href="#features">
-                  <button className="btn-ghost gap-2 px-7 py-3 text-sm">Explore features</button>
-                </a>
               </div>
-            </div>
+              <div className="h-px mt-10 mx-auto max-w-xs" style={{ background: "linear-gradient(90deg, transparent, rgba(34,211,238,0.3), transparent)" }} />
+            </BentoCard>
           </motion.div>
         </section>
 
-        {/* Footer */}
-        <footer className="px-6 py-8 text-center" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-lg text-[10px] font-bold"
-                 style={{ background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.2)", color: "#a78bfa" }}>CE</div>
-            <span className="text-sm font-semibold" style={{ color: "var(--text-2)" }}>CampusEye</span>
+        {/* ── FOOTER ─────────────────────────────────────────────── */}
+        <footer className="border-t px-6 py-8 text-center text-xs"
+          style={{ borderColor: "rgba(255,255,255,0.05)", color: "rgba(80,80,100,0.8)" }}>
+          <div className="flex items-center justify-center gap-2">
+            <Zap className="h-3.5 w-3.5" style={{ color: "#a78bfa" }} />
+            <span>CampusEye · PFE Project · EST · 2026</span>
           </div>
-          <p className="text-xs" style={{ color: "var(--text-3)" }}>
-            PFE Project · EST · 2026 · AI-Powered Academic Platform
-          </p>
         </footer>
 
       </div>

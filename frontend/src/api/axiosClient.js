@@ -37,6 +37,16 @@ axiosClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    // ── Role-mismatch 403 detection ──────────────────────────────
+    // A 403 from DRF's permission layer (PermissionDenied) carries a `detail`
+    // field and NO `reason`. Business-rule rejections (e.g. wrong TP group,
+    // window closed) carry a `reason` — leave those alone. For a genuine
+    // permission/role mismatch, signal AuthContext to re-validate identity.
+    if (error.response?.status === 403 && !error.response?.data?.reason) {
+      window.dispatchEvent(new CustomEvent("auth:forbidden"));
+      return Promise.reject(error);
+    }
+
     // Only handle 401s, and don't retry the refresh call itself
     if (
       error.response?.status !== 401 ||
