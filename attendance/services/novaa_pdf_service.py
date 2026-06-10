@@ -94,8 +94,17 @@ def _register_fonts():
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
 
-        win = Path("C:/Windows/Fonts")
+        win    = Path("C:/Windows/Fonts")
+        bundled = Path(__file__).resolve().parent / "fonts"           # repo-bundled (cross-platform)
+        dejavu  = Path("/usr/share/fonts/truetype/dejavu")            # Debian/Ubuntu (Render)
+        dejavu2 = Path("/usr/share/fonts/dejavu")                     # Fedora/others
         candidates = [
+            # 1. Bundled in the repo → works identically on every OS (recommended).
+            ("NovaaSans", bundled / "DejaVuSans.ttf", bundled / "DejaVuSans-Bold.ttf"),
+            # 2. System DejaVu on Linux hosts (Render, most Debian images).
+            ("NovaaSans", dejavu / "DejaVuSans.ttf", dejavu / "DejaVuSans-Bold.ttf"),
+            ("NovaaSans", dejavu2 / "DejaVuSans.ttf", dejavu2 / "DejaVuSans-Bold.ttf"),
+            # 3. Windows dev machines.
             ("NovaaSans", win / "arial.ttf", win / "arialbd.ttf"),
             ("NovaaSans", win / "DejaVuSans.ttf", win / "DejaVuSans-Bold.ttf"),
             ("NovaaSans", win / "calibri.ttf", win / "calibrib.ttf"),
@@ -144,8 +153,8 @@ def generate_pdf(
     try:
         from attendance.services.novaa_tutor_service import _humanize_math
         content = _humanize_math(content or "")
-    except Exception:
-        pass
+    except Exception as _exc:
+        logger.debug("[suppressed] %s", _exc)
     content = _demote_scripts(_strip_emoji(content or ""))
     title        = _strip_emoji(title or "NOVAA Document")
     course_title = _strip_emoji(course_title or "")

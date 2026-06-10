@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import axiosClient from "../../api/axiosClient";
+import { API_BASE } from "../../api/config";
 
 // Streaming endpoint lives alongside the axios base URL.
-const STREAM_URL = "http://127.0.0.1:8000/api/ai/ask/stream/";
+const STREAM_URL = `${API_BASE}/ai/ask/stream/`;
 
 /**
  * Manages the message list and the full AI send / receive cycle.

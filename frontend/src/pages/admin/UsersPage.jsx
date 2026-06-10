@@ -251,15 +251,15 @@ const UserDetailModal = ({ open, onClose, userId, role }) => {
                           {isTeacher ? (
                             <div className="grid grid-cols-4 gap-2 text-center">
                               <div><p className="text-base font-bold text-violet-400">{c.students}</p><p className="text-[10px] text-white/30">Students</p></div>
-                              <div><p className="text-base font-bold text-green-400">{c.present}</p><p className="text-[10px] text-white/30">Present</p></div>
+                              <div><p className="text-base font-bold text-green-400">{c.present}</p><p className="text-[10px] text-white/30">Présent</p></div>
                               <div><p className="text-base font-bold text-red-400">{c.absent}</p><p className="text-[10px] text-white/30">Absent</p></div>
                               <div><p className="text-base font-bold text-amber-400">{c.materials}</p><p className="text-[10px] text-white/30">Materials</p></div>
                             </div>
                           ) : (
                             <div className="grid grid-cols-4 gap-2 mb-3 text-center">
-                              <div><p className="text-base font-bold text-green-400">{c.present}</p><p className="text-[10px] text-white/30">Present</p></div>
+                              <div><p className="text-base font-bold text-green-400">{c.present}</p><p className="text-[10px] text-white/30">Présent</p></div>
                               <div><p className="text-base font-bold text-red-400">{c.absent}</p><p className="text-[10px] text-white/30">Absent</p></div>
-                              <div><p className="text-base font-bold text-amber-400">{c.late}</p><p className="text-[10px] text-white/30">Late</p></div>
+                              <div><p className="text-base font-bold text-amber-400">{c.late}</p><p className="text-[10px] text-white/30">En retard</p></div>
                               <div><p className={`text-base font-bold ${s.text}`}>{c.absent}/{c.max_absences}</p><p className="text-[10px] text-white/30">Limit</p></div>
                             </div>
                           )}
@@ -703,7 +703,7 @@ const DeleteConfirm = ({ user, onCancel, onConfirm, deleting }) => {
         <h3 className="mt-4 text-lg font-semibold text-white">Delete user?</h3>
         <p className="mt-2 text-sm text-white/50">This will permanently delete <span className="text-white">{user.username}</span> and all their data.</p>
         <div className="mt-5 flex gap-2">
-          <button onClick={onCancel} className="flex-1 rounded-lg border border-white/10 px-4 py-2 text-sm text-white/60 hover:bg-white/[0.05] transition">Cancel</button>
+          <button onClick={onCancel} className="flex-1 rounded-lg border border-white/10 px-4 py-2 text-sm text-white/60 hover:bg-white/[0.05] transition">Annuler</button>
           <button onClick={onConfirm} disabled={deleting} className="flex-1 rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white hover:bg-red-400 disabled:opacity-50 transition">
             {deleting ? "Deleting..." : "Delete"}
           </button>
@@ -1053,16 +1053,16 @@ const UsersPage = () => {
         <div className="page-header">
           <div>
             <p className="label">Admin / Users</p>
-            <h1 className="page-title mt-1">Users</h1>
-            <p className="page-sub">Create and manage platform users across all roles.</p>
+            <h1 className="page-title mt-1">Utilisateurs</h1>
+            <p className="page-sub">Créez et gérez les utilisateurs de la plateforme, tous rôles confondus.</p>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => setImportOpen(true)}
                     className="flex items-center gap-1.5 rounded-[var(--radius)] border border-violet-500/30 bg-violet-500/10 px-4 py-2 text-sm font-medium text-violet-300 hover:bg-violet-500/20 transition">
-              <Table2 className="h-4 w-4" /> Import CSV
+              <Table2 className="h-4 w-4" /> Importer CSV
             </button>
             <button onClick={() => { setEditingUser(null); setModalOpen(true); }} className="btn-primary gap-1.5">
-              <Plus className="h-4 w-4" /> New User
+              <Plus className="h-4 w-4" /> Nouvel utilisateur
             </button>
           </div>
         </div>

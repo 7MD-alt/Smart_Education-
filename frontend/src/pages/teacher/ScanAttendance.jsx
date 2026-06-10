@@ -144,8 +144,8 @@ function ScanAttendance() {
         <div className="page-header">
           <div>
             <p className="label">Attendance</p>
-            <h1 className="page-title mt-1">Live Attendance Scan</h1>
-            <p className="page-sub">Point the camera at students to auto-mark attendance via face recognition.</p>
+            <h1 className="page-title mt-1">Scan de présence en direct</h1>
+            <p className="page-sub">Pointez la caméra vers les étudiants pour marquer la présence automatiquement par reconnaissance faciale.</p>
           </div>
           {result && (
             <div className="flex items-center gap-2">
@@ -305,13 +305,13 @@ function ScanAttendance() {
                 {!result ? (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
                     <ScanLine className="h-8 w-8" style={{ color: "var(--text-3)" }} />
-                    <p className="mt-3 text-sm" style={{ color: "var(--text-2)" }}>No scan results yet</p>
+                    <p className="mt-3 text-sm" style={{ color: "var(--text-2)" }}>Aucun résultat de scan</p>
                     <p className="mt-1 text-xs" style={{ color: "var(--text-3)" }}>Start scanning to see the class roster</p>
                   </div>
                 ) : result.roster?.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
                     <XCircle className="h-8 w-8" style={{ color: "var(--text-3)" }} />
-                    <p className="mt-3 text-sm" style={{ color: "var(--text-2)" }}>No enrolled students found</p>
+                    <p className="mt-3 text-sm" style={{ color: "var(--text-2)" }}>Aucun étudiant inscrit</p>
                   </div>
                 ) : (
                   <>

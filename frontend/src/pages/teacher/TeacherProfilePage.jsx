@@ -39,8 +39,8 @@ const TeacherProfilePage = () => {
         <div className="page-header">
           <div>
             <p className="label">Account</p>
-            <h1 className="page-title mt-1">My Profile</h1>
-            <p className="page-sub">Your account details and teaching overview.</p>
+            <h1 className="page-title mt-1">Mon profil</h1>
+            <p className="page-sub">Vos informations de compte et aperçu de votre enseignement.</p>
           </div>
         </div>
 
@@ -54,7 +54,7 @@ const TeacherProfilePage = () => {
             <p className="text-sm" style={{ color: "var(--text-2)" }}>@{user?.username}</p>
             <div className="mt-2 flex gap-2">
               <span className="badge badge-cyan"><ShieldCheck className="h-3 w-3" /> Teacher</span>
-              {user?.is_active && <span className="badge badge-green"><span className="h-1.5 w-1.5 rounded-full bg-green-400" /> Active</span>}
+              {user?.is_active && <span className="badge badge-green"><span className="h-1.5 w-1.5 rounded-full bg-green-400" />Actif</span>}
             </div>
           </div>
         </div>

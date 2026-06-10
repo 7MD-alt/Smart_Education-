@@ -191,7 +191,7 @@ const StudentAttendancePage = () => {
           {visible.length === 0 ? (
             <div className="empty-state">
               <CalendarDays className="h-8 w-8" style={{ color: "var(--text-3)" }} />
-              <p className="text-sm font-medium" style={{ color: "var(--text-2)" }}>No records found</p>
+              <p className="text-sm font-medium" style={{ color: "var(--text-2)" }}>Aucun enregistrement trouvé</p>
               <p className="text-xs" style={{ color: "var(--text-3)" }}>
                 {filterStatus !== "ALL" ? "Try changing the filter above" : "Attendance appears here once sessions are recorded"}
               </p>
@@ -211,12 +211,12 @@ const StudentAttendancePage = () => {
                           <div className="flex items-center gap-2.5">
                             <span className={`h-2 w-2 shrink-0 rounded-full ${cfg.dot}`} />
                             <span className="text-sm font-medium" style={{ color: "var(--text-1)" }}>
-                              {d ? d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—"}
+                              {d ? d.toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }) : "—"}
                             </span>
                           </div>
                         </td>
                         <td className="hidden sm:table-cell">
-                          {d ? d.toLocaleDateString("en-GB", { weekday: "long" }) : "—"}
+                          {d ? d.toLocaleDateString("fr-FR", { weekday: "long" }) : "—"}
                         </td>
                         <td>
                           <span className={`badge ${cfg.badge}`}>

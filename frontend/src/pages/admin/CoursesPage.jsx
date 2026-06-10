@@ -19,7 +19,7 @@ const Modal = ({ open, onClose, title, children, onSave, saving, wide }) => {
         </div>
         <div className="modal-body flex-1 overflow-y-auto">{children}</div>
         <div className="modal-footer">
-          <button onClick={onClose} className="btn-ghost px-4 py-2 text-sm">Cancel</button>
+          <button onClick={onClose} className="btn-ghost px-4 py-2 text-sm">Annuler</button>
           <button onClick={onSave} disabled={saving} className="btn-primary px-5 py-2 text-sm">{saving ? "Saving…" : "Save"}</button>
         </div>
       </div>
@@ -251,11 +251,11 @@ const CoursesPage = () => {
         <div className="page-header">
           <div>
             <p className="label">Admin / Courses</p>
-            <h1 className="page-title mt-1">Courses</h1>
-            <p className="page-sub">Create courses, assign teachers, and link them to filieres.</p>
+            <h1 className="page-title mt-1">Cours</h1>
+            <p className="page-sub">Créez des cours, assignez des enseignants et liez-les aux filières.</p>
           </div>
           <button onClick={openCreate} disabled={teachers.length === 0} className="btn-primary gap-1.5 disabled:opacity-40">
-            <Plus className="h-4 w-4" /> New Course
+            <Plus className="h-4 w-4" /> Nouveau cours
           </button>
         </div>
 
@@ -284,7 +284,7 @@ const CoursesPage = () => {
           <div className="flex flex-1 max-w-xs items-center gap-2 rounded-[var(--radius)] px-3 py-2"
                style={{ border: "1px solid var(--border)", background: "var(--surface)" }}>
             <Search className="h-4 w-4" style={{ color: "var(--text-3)" }} />
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search courses…"
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher des cours…"
                    className="w-full bg-transparent text-sm outline-none" style={{ color: "var(--text-1)" }} />
           </div>
         </div>
@@ -296,14 +296,14 @@ const CoursesPage = () => {
           <div className="empty-state">
             <BookOpen className="h-8 w-8" style={{ color: "var(--text-3)" }} />
             <div>
-              <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>No courses found</p>
+              <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Aucun cours trouvé</p>
               <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>{search || teacherFilter !== "ALL" ? "Clear filters." : "Create your first course."}</p>
             </div>
           </div>
         ) : (
           <div className="table-wrap">
             <table className="table-base">
-              <thead><tr><th>Course</th><th>Teacher</th><th>Filieres</th><th>Materials</th><th>Max absences</th><th className="text-right">Actions</th></tr></thead>
+              <thead><tr><th>Course</th><th>Teacher</th><th>Filières</th><th>Materials</th><th>Max absences</th><th className="text-right">Actions</th></tr></thead>
               <tbody>
                 {filtered.map(c => {
                   const teacher = getTeacher(c);
@@ -368,7 +368,7 @@ const CoursesPage = () => {
 
       {/* Create/Edit Modal */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)}
-             title={editing ? "Edit Course" : "New Course"} onSave={handleSave} saving={saving} wide>
+             title={editing ? "Edit Course" : "Nouveau cours"} onSave={handleSave} saving={saving} wide>
         <div className="space-y-4">
           {formErr && <div className="rounded-[var(--radius)] px-3 py-2 text-sm text-red-400"
                           style={{ background: "rgba(185,28,28,0.08)", border: "1px solid rgba(185,28,28,0.2)" }}>{formErr}</div>}
@@ -432,7 +432,7 @@ const CoursesPage = () => {
               <h3 className="text-base font-semibold" style={{ color: "var(--text-1)" }}>Delete course?</h3>
               <p className="mt-1.5 text-sm" style={{ color: "var(--text-2)" }}>"{delTarget.title}", its materials and all attendance records will be permanently deleted.</p>
               <div className="mt-5 flex gap-2">
-                <button onClick={() => setDelTarget(null)} className="btn-ghost flex-1 py-2 text-sm">Cancel</button>
+                <button onClick={() => setDelTarget(null)} className="btn-ghost flex-1 py-2 text-sm">Annuler</button>
                 <button onClick={handleDelete} disabled={deleting} className="btn-danger flex-1 py-2 text-sm">{deleting ? "Deleting…" : "Delete"}</button>
               </div>
             </div>

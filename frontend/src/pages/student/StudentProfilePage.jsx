@@ -284,7 +284,7 @@ const StudentProfilePage = () => {
         <div className="page-header">
           <div>
             <p className="label">Account</p>
-            <h1 className="page-title mt-1">My Profile</h1>
+            <h1 className="page-title mt-1">Mon profil</h1>
           </div>
         </div>
 
@@ -298,7 +298,7 @@ const StudentProfilePage = () => {
             <p className="text-sm" style={{ color: "var(--text-2)" }}>@{user?.username}</p>
             <div className="mt-2 flex gap-2">
               <span className="badge badge-violet"><ShieldCheck className="h-3 w-3" /> Student</span>
-              {user?.is_active && <span className="badge badge-green"><span className="h-1.5 w-1.5 rounded-full bg-green-400" /> Active</span>}
+              {user?.is_active && <span className="badge badge-green"><span className="h-1.5 w-1.5 rounded-full bg-green-400" />Actif</span>}
             </div>
           </div>
         </div>
@@ -340,7 +340,7 @@ const StudentProfilePage = () => {
                       <p className="text-xs mt-0.5 max-w-xs" style={{ color: "var(--text-3)" }}>{cfg.sub}</p>
                       {reqStatus === "PENDING" && faceRequest?.created_at && (
                         <p className="mt-1.5 text-xs text-amber-400/70">
-                          Submitted {new Date(faceRequest.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                          Submitted {new Date(faceRequest.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                         </p>
                       )}
                     </div>

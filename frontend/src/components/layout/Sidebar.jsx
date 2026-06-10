@@ -10,13 +10,13 @@ import logo from "../../assets/smart_education_icon_mark.png";
 
 const ROLES = {
   TEACHER: {
-    label: "Teacher", accent: "#22d3ee",
+    label: "Enseignant", accent: "#22d3ee",
     glow: "rgba(8,145,178,0.35)", dot: "bg-cyan-400",
     gradFrom: "rgba(8,145,178,0.18)", gradTo: "rgba(8,145,178,0)",
     links: [
-      { to: "/teacher",         label: "Dashboard",  icon: LayoutDashboard },
-      { to: "/teacher/courses", label: "My Courses", icon: BookOpen        },
-      { to: "/teacher/profile", label: "Profile",    icon: UserCircle      },
+      { to: "/teacher",         label: "Tableau de bord", icon: LayoutDashboard },
+      { to: "/teacher/courses", label: "Mes cours",       icon: BookOpen        },
+      { to: "/teacher/profile", label: "Profil",          icon: UserCircle      },
     ],
   },
   ADMIN: {
@@ -24,25 +24,25 @@ const ROLES = {
     glow: "rgba(190,24,93,0.35)", dot: "bg-pink-400",
     gradFrom: "rgba(190,24,93,0.18)", gradTo: "rgba(190,24,93,0)",
     links: [
-      { to: "/admin",             label: "Dashboard",   icon: LayoutDashboard },
-      { to: "/admin/users",       label: "Users",       icon: Users           },
-      { to: "/admin/departments", label: "Departments", icon: Building2       },
-      { to: "/admin/filieres",    label: "Filieres",    icon: Layers          },
-      { to: "/admin/courses",       label: "Courses",     icon: BookOpen   },
-      { to: "/admin/face-requests", label: "Face ID",     icon: ScanFace   },
-      { to: "/admin/profile",       label: "Profile",     icon: UserCircle },
+      { to: "/admin",             label: "Tableau de bord", icon: LayoutDashboard },
+      { to: "/admin/users",       label: "Utilisateurs",    icon: Users           },
+      { to: "/admin/departments", label: "Départements",    icon: Building2       },
+      { to: "/admin/filieres",    label: "Filières",        icon: Layers          },
+      { to: "/admin/courses",       label: "Cours",         icon: BookOpen   },
+      { to: "/admin/face-requests", label: "Face ID",       icon: ScanFace   },
+      { to: "/admin/profile",       label: "Profil",        icon: UserCircle },
     ],
   },
   STUDENT: {
-    label: "Student", accent: "#a78bfa",
+    label: "Étudiant", accent: "#a78bfa",
     glow: "rgba(124,58,237,0.35)", dot: "bg-violet-400",
     gradFrom: "rgba(124,58,237,0.18)", gradTo: "rgba(124,58,237,0)",
     links: [
-      { to: "/student",            label: "Dashboard", icon: LayoutDashboard },
-      { to: "/student/seances",    label: "Séances",   icon: CalendarCheck   },
-      { to: "/student/attendance", label: "Attendance",icon: CalendarDays    },
-      { to: "/student/novaa",      label: "NOVAA",     icon: MessageSquare, novaa: true },
-      { to: "/student/profile",    label: "Profile",   icon: UserCircle      },
+      { to: "/student",            label: "Tableau de bord", icon: LayoutDashboard },
+      { to: "/student/seances",    label: "Séances",         icon: CalendarCheck   },
+      { to: "/student/attendance", label: "Présence",        icon: CalendarDays    },
+      { to: "/student/novaa",      label: "NOVAA",           icon: MessageSquare, novaa: true },
+      { to: "/student/profile",    label: "Profil",          icon: UserCircle      },
     ],
   },
 };
@@ -108,7 +108,7 @@ const SidebarContent = ({ user, logout, onClose }) => {
               className="mt-0.5 text-[9px] font-semibold uppercase"
               style={{ letterSpacing: "0.1em", color: "rgba(139,92,246,0.6)" }}
             >
-              Platform
+              Plateforme
             </div>
           </div>
         </div>
@@ -276,7 +276,7 @@ const SidebarContent = ({ user, logout, onClose }) => {
           }}
         >
           <LogOut className="h-4 w-4 shrink-0" />
-          <span className="text-sm" style={{ letterSpacing: "-0.01em" }}>Sign out</span>
+          <span className="text-sm" style={{ letterSpacing: "-0.01em" }}>Déconnexion</span>
         </button>
       </div>
     </div>

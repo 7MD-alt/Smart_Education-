@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import axiosClient from "../../api/axiosClient";
+import { authedFetch } from "../../api/config";
 import { useToast } from "../../context/ToastContext";
 import DashboardLayout from "../../components/layout/DashboardLayout";
 import {
@@ -213,10 +214,8 @@ const SeanceRosterPage = () => {
     if (!seance) return;
     setDownloading(true);
     try {
-      const token = localStorage.getItem("access_token");
-      const res = await fetch(
-        `http://127.0.0.1:8000/api/teacher/courses/${seance.course_id}/report/?seance_id=${seanceId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+      const res = await authedFetch(
+        `teacher/courses/${seance.course_id}/report/?seance_id=${seanceId}`
       );
       if (!res.ok) throw new Error();
       const blob = await res.blob();

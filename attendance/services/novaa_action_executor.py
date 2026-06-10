@@ -40,6 +40,12 @@ from typing import Optional
 logger = logging.getLogger("NovaaActionExecutor")
 
 
+def _naive_local_now():
+    """Wall-clock now in the configured TIME_ZONE, naive — matches séance fields."""
+    from django.utils import timezone
+    return timezone.localtime(timezone.now()).replace(tzinfo=None)
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
@@ -174,7 +180,7 @@ def start_session(teacher_user_id: int, course_name: str | None = None,
         seance = Seance.objects.create(
             course=course,
             date=today,
-            start_time=datetime.now().time(),
+            start_time=_naive_local_now().time(),
             duration_minutes=90,
             status=SeanceStatus.SCHEDULED,
             created_by_id=teacher_user_id,
@@ -444,8 +450,8 @@ def send_bulk_email(
                            if course_name.strip().lower() in c.title.lower()]
                 if matched:
                     course_id = matched[0].id
-            except Exception:
-                pass
+            except Exception as _exc:
+                logger.debug("[suppressed] %s", _exc)
 
     # ── Defaults — ensure subject/body are never empty ────────────────────────
     subject = (subject or "").strip() or "Important Notice from CampusEye"
@@ -632,8 +638,8 @@ def approve_face_request(admin_user_id: int, request_id: int) -> dict:
         if hasattr(profile, "face_image"):
             profile.face_image = req.image
             profile.save(update_fields=["face_image"])
-    except Exception:
-        pass
+    except Exception as _exc:
+        logger.debug("[suppressed] %s", _exc)
 
     _notify_users(
         [req.student.user_id],
@@ -862,7 +868,7 @@ def create_seance(
     # ── Auto-activate if within 5-min window ─────────────────────────────────
     seance_start_dt = _dt.combine(seance_date, seance_time)
     initial_status  = SeanceStatus.SCHEDULED
-    if _dt.now() >= seance_start_dt - _td(minutes=5):
+    if _naive_local_now() >= seance_start_dt - _td(minutes=5):
         initial_status = SeanceStatus.ACTIVE
 
     from attendance.models import generate_seance_code
@@ -1025,19 +1031,27 @@ def attendance_report(user_id: int, role: str, filiere: str = "",
         return _ok(action, f"Aucun cours trouvé pour {scope_label}.", {"courses": 0})
 
     # ── Per-course tally ──────────────────────────────────────────────────────
+    from django.db.models import Count
     lines = [f"📊 **Rapport de présence — {scope_label}**\n"]
     grand_present = grand_absent = grand_danger = 0
     for course in courses:
         fil_ids = FiliereCourse.objects.filter(course=course).values_list("filiere_id", flat=True)
-        students = StudentProfile.objects.filter(filiere_id__in=fil_ids).select_related("user").distinct()
-        n_students = students.count()
+        students = list(StudentProfile.objects.filter(filiere_id__in=fil_ids)
+                        .select_related("user").distinct())
+        n_students = len(students)
         present = AttendanceRecord.objects.filter(course=course, status="PRESENT").count()
         absent  = AttendanceRecord.objects.filter(course=course, status="ABSENT").count()
-        danger  = 0
+        # One aggregated query for per-student absence counts (no N+1 loop).
+        absent_by_student = {
+            row["student_id"]: row["n"]
+            for row in AttendanceRecord.objects
+                .filter(course=course, status="ABSENT", student__in=students)
+                .values("student_id").annotate(n=Count("id"))
+        }
+        danger = 0
         danger_names = []
         for sp in students:
-            abs_count = AttendanceRecord.objects.filter(student=sp, course=course, status="ABSENT").count()
-            if abs_count >= course.max_absences:
+            if absent_by_student.get(sp.pk, 0) >= course.max_absences:
                 danger += 1
                 danger_names.append(sp.user.get_full_name() or sp.user.username)
         grand_present += present; grand_absent += absent; grand_danger += danger

@@ -1,0 +1,69 @@
+@startuml CampusEye_Sequence_FaceRecognition
+title Student Check-in via Face Recognition (with Séance Code)
+
+autonumber
+skinparam responseMessageBelowArrow true
+
+actor Student as S
+participant "StudentSeancesPage\n(React)" as UI
+participant "Django REST API" as API
+database "Database" as DB
+participant "face_recognition\n(lib)" as FR
+
+note over S, UI
+  Séance list already loaded
+  (requires_code = true; the code value is NOT sent)
+end note
+
+S -> UI : Click "Pointer ma présence"
+UI -> UI : Open CheckInModal (step = "code")
+
+== 1. Code gate — unlocks the camera ==
+S -> UI : Enter séance code
+UI -> API : POST /student/seances/{id}/verify-code/ {code}
+API -> DB : SELECT Seance.check_in_code
+DB --> API : stored code
+alt code matches
+  API --> UI : 200 {valid: true}
+  UI -> UI : step = "camera" (acquire webcam)
+else code wrong / missing
+  API --> UI : 400 {valid: false, error}
+  UI --> S : Show "Code incorrect" (camera stays locked)
+end
+
+== 2. Face recognition ==
+S -> UI : Center face, "Capturer & vérifier"
+UI -> UI : Capture frame to JPEG blob
+UI -> API : POST /student/seances/{id}/check-in/ (image + code)
+
+API -> API : Validate séance ACTIVE, time window,\nnot already checked in, correct TP group
+API -> API : Re-validate check_in_code (defense in depth)
+API -> DB : SELECT StudentProfile.face_encoding
+DB --> API : reference encoding
+
+alt no registered face
+  API --> UI : 400 {reason: NO_REGISTERED_FACE}
+else face encoding present
+  API -> FR : load image + face_encodings(selfie)
+  FR --> API : detected encodings
+  alt no face / multiple faces
+    API --> UI : 200 {matched:false,\nreason: NO_FACE_DETECTED | MULTIPLE_FACES}
+  else exactly one face
+    API -> FR : face_distance(reference, selfie)
+    FR --> API : distance d
+    alt d < THRESHOLD (match)
+      API -> API : status = LATE if > 15 min late else PRESENT
+      API -> DB : INSERT AttendanceRecord(seance, student, status)
+      DB --> API : saved
+      API --> UI : 200 {matched:true, status, confidence}
+      UI --> S : Présence enregistrée
+    else d >= THRESHOLD (no match)
+      API --> UI : 200 {matched:false, reason: NOT_RECOGNIZED}
+      UI --> S : Visage non reconnu (retry)
+    end
+  end
+end
+
+UI -> UI : stopCamera() (release webcam)
+
+@enduml

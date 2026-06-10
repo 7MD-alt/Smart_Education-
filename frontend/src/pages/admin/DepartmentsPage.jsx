@@ -19,7 +19,7 @@ const FormModal = ({ open, onClose, title, children, onSubmit, saving }) => {
         </div>
         <div className="modal-body">{children}</div>
         <div className="modal-footer">
-          <button onClick={onClose} className="btn-ghost px-4 py-2 text-sm">Cancel</button>
+          <button onClick={onClose} className="btn-ghost px-4 py-2 text-sm">Annuler</button>
           <button onClick={onSubmit} disabled={saving} className="btn-primary px-5 py-2 text-sm">
             {saving ? "Saving…" : "Save"}
           </button>
@@ -42,7 +42,7 @@ const DeleteModal = ({ open, name, onClose, onConfirm, deleting, description }) 
           <h3 className="text-base font-semibold" style={{ color: "var(--text-1)" }}>Delete {name}?</h3>
           <p className="mt-1.5 text-sm" style={{ color: "var(--text-2)" }}>{description} This cannot be undone.</p>
           <div className="mt-5 flex gap-2">
-            <button onClick={onClose} className="btn-ghost flex-1 py-2 text-sm">Cancel</button>
+            <button onClick={onClose} className="btn-ghost flex-1 py-2 text-sm">Annuler</button>
             <button onClick={onConfirm} disabled={deleting} className="btn-danger flex-1 py-2 text-sm">
               {deleting ? "Deleting…" : "Delete"}
             </button>
@@ -97,7 +97,7 @@ const DeptDetailModal = ({ open, onClose, dept, filieres, students }) => {
 
           {/* Filieres list */}
           <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-white/30 mb-3">Filieres</p>
+            <p className="text-xs font-medium uppercase tracking-wider text-white/30 mb-3">Filières</p>
             {deptFilieres.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <Layers className="h-7 w-7 text-white/15 mb-2" />
@@ -208,11 +208,11 @@ const DepartmentsPage = () => {
         <div className="page-header">
           <div>
             <p className="label">Admin / Departments</p>
-            <h1 className="page-title mt-1">Departments</h1>
-            <p className="page-sub">Academic units that organize filieres and courses.</p>
+            <h1 className="page-title mt-1">Départements</h1>
+            <p className="page-sub">Unités académiques qui organisent les filières et les cours.</p>
           </div>
           <button onClick={openCreate} className="btn-primary gap-1.5">
-            <Plus className="h-4 w-4" /> New Department
+            <Plus className="h-4 w-4" /> Nouveau département
           </button>
         </div>
 
@@ -226,7 +226,7 @@ const DepartmentsPage = () => {
           <div className="flex flex-1 max-w-xs items-center gap-2 rounded-[var(--radius)] px-3 py-2"
                style={{ border: "1px solid var(--border)", background: "var(--surface)" }}>
             <Search className="h-4 w-4 shrink-0" style={{ color: "var(--text-3)" }} />
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search departments…"
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher des départements…"
                    className="w-full bg-transparent text-sm outline-none" style={{ color: "var(--text-1)" }} />
           </div>
         </div>
@@ -238,18 +238,18 @@ const DepartmentsPage = () => {
           <div className="empty-state">
             <Building2 className="h-8 w-8" style={{ color: "var(--text-3)" }} />
             <div>
-              <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>No departments found</p>
+              <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Aucun département trouvé</p>
               <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>
                 {search ? "Clear the search to see all." : "Create your first department."}
               </p>
             </div>
-            {!search && <button onClick={openCreate} className="btn-ghost gap-1.5 px-4 py-2 text-sm"><Plus className="h-4 w-4" /> Create</button>}
+            {!search && <button onClick={openCreate} className="btn-ghost gap-1.5 px-4 py-2 text-sm"><Plus className="h-4 w-4" />Créer</button>}
           </div>
         ) : (
           <div className="table-wrap">
             <table className="table-base">
               <thead>
-                <tr><th>Name</th><th>Code</th><th>Filieres</th><th className="text-right">Actions</th></tr>
+                <tr><th>Name</th><th>Code</th><th>Filières</th><th className="text-right">Actions</th></tr>
               </thead>
               <tbody>
                 {filtered.map(d => (
@@ -294,7 +294,7 @@ const DepartmentsPage = () => {
 
       {/* Modals */}
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)}
-                 title={editing ? "Edit Department" : "New Department"}
+                 title={editing ? "Edit Department" : "Nouveau département"}
                  onSubmit={handleSave} saving={saving}>
         <div className="space-y-4">
           {formErr && <div className="rounded-[var(--radius)] px-3 py-2 text-sm text-red-400"

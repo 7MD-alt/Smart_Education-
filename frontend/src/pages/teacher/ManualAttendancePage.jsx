@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import axiosClient from "../../api/axiosClient";
+import { authedFetch } from "../../api/config";
 import DashboardLayout from "../../components/layout/DashboardLayout";
 import { useToast } from "../../context/ToastContext";
 import {
@@ -185,11 +186,7 @@ const ManualAttendancePage = () => {
   const downloadReport = async () => {
     setDownloading(true);
     try {
-      const token = localStorage.getItem("access_token");
-      const res   = await fetch(
-        `http://127.0.0.1:8000/api/teacher/courses/${courseId}/report/`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const res = await authedFetch(`teacher/courses/${courseId}/report/`);
       if (!res.ok) throw new Error();
       const blob = await res.blob();
       const url  = URL.createObjectURL(blob);

@@ -1,0 +1,206 @@
+@startuml CampusEye_Class_Diagram
+title CampusEye — Class Diagram
+
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+hide circle
+
+' ────────────────────────── Enumerations ──────────────────────────
+enum Role {
+  STUDENT
+  TEACHER
+  ADMIN
+}
+enum SessionType {
+  COURS
+  TP
+}
+enum TPGroup {
+  NONE
+  GROUP_A
+  GROUP_B
+}
+enum SeanceStatus {
+  SCHEDULED
+  ACTIVE
+  COMPLETED
+}
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+}
+enum FaceRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+' ────────────────────────── Identity ──────────────────────────
+class User {
+  +id : int
+  +username : string
+  +email : string
+  +first_name : string
+  +last_name : string
+  +role : Role
+  +is_active : bool
+}
+
+class AdminProfile {
+  +user : User <<PK>>
+}
+
+class TeacherProfile {
+  +user : User <<PK>>
+}
+
+class StudentProfile {
+  +user : User <<PK>>
+  +student_id : string
+  +massar_code : string
+  +semester : int
+  +face_encoding : JSON
+  +tp_group : TPGroup
+}
+
+' ────────────────────────── Structure ──────────────────────────
+class Department {
+  +id : int
+  +code : string
+  +name : string
+}
+
+class Filiere {
+  +id : int
+  +code : string
+  +name : string
+}
+
+' ────────────────────────── Courses ──────────────────────────
+class Course {
+  +id : int
+  +title : string
+  +max_absences : int
+}
+
+class FiliereCourse <<association>> {
+  +id : int
+  +semester : int
+}
+
+class CourseMaterial {
+  +id : int
+  +file : File
+  +uploaded_at : datetime
+}
+
+class MaterialEmbedding {
+  +id : int
+  +text_chunk : string
+  +embedding : JSON
+}
+
+' ────────────────────────── Séances & attendance ──────────────────────────
+class Seance {
+  +id : int
+  +date : date
+  +start_time : time
+  +duration_minutes : int
+  +session_type : SessionType
+  +tp_group : TPGroup
+  +status : SeanceStatus
+  +check_in_code : string
+  +created_at : datetime
+}
+
+class AttendanceRecord {
+  +id : int
+  +date : date
+  +status : AttendanceStatus
+}
+
+class Assignment {
+  +id : int
+  +title : string
+  +instructions : text
+  +due_date : date
+}
+
+' ────────────────────────── Face recognition ──────────────────────────
+class FaceRegistrationRequest {
+  +id : int
+  +image : Image
+  +status : FaceRequestStatus
+  +reviewed_at : datetime
+}
+
+' ────────────────────────── AI tutor (NOVAA) ──────────────────────────
+class ChatSession {
+  +id : int
+  +title : string
+  +started_at : datetime
+}
+
+class ChatMessage {
+  +id : int
+  +sender_role : string
+  +content : string
+  +timestamp : datetime
+}
+
+class StudentMemory {
+  +id : int
+  +category : string
+  +fact : string
+  +confidence : float
+  +mentions : int
+}
+
+' ────────────────────────── Notifications ──────────────────────────
+class Notification {
+  +id : int
+  +type : string
+  +title : string
+  +message : string
+  +is_read : bool
+}
+
+' ══════════════════════════ Relationships ══════════════════════════
+User "1" -- "0..1" AdminProfile
+User "1" -- "0..1" TeacherProfile
+User "1" -- "0..1" StudentProfile
+
+Department "1" -- "*" Filiere
+Department "1" -- "*" TeacherProfile
+Filiere "1" -- "*" StudentProfile
+
+TeacherProfile "1" -- "*" Course
+Filiere "1" -- "*" FiliereCourse
+Course "1" -- "*" FiliereCourse
+Course "1" -- "*" CourseMaterial
+CourseMaterial "1" -- "*" MaterialEmbedding
+
+Course "1" -- "*" Seance
+Seance "1" -- "*" AttendanceRecord
+StudentProfile "1" -- "*" AttendanceRecord
+Course "1" -- "*" AttendanceRecord
+Course "1" -- "*" Assignment
+
+StudentProfile "1" -- "*" FaceRegistrationRequest
+User "1" -- "*" FaceRegistrationRequest : reviewed_by
+
+StudentProfile "1" -- "*" ChatSession
+ChatSession "1" -- "*" ChatMessage
+StudentProfile "1" -- "*" StudentMemory
+
+User "1" -- "*" Notification
+User "1" -- "*" Seance : created_by
+
+note bottom of Seance
+  check_in_code gates student check-in:
+  the student must enter it before face
+  recognition runs. Never exposed to students.
+end note
+
+@enduml

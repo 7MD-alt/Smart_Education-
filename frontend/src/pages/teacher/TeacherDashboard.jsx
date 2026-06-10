@@ -173,7 +173,7 @@ const TeacherDashboard = () => {
                 WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
               }}>{firstName}</span>
             </h1>
-            <p className="page-sub mt-2">Courses · Materials · Attendance</p>
+            <p className="page-sub mt-2">Cours · Supports · Présence</p>
           </div>
           <Link to="/teacher/scan">
             <button className="btn-cyan gap-1.5">
@@ -235,7 +235,7 @@ const TeacherDashboard = () => {
         {/* Courses */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 style={{ fontSize: "0.8125rem", fontWeight: 650, letterSpacing: "-0.01em", color: "var(--text-1)" }}>My Courses</h2>
+            <h2 style={{ fontSize: "0.8125rem", fontWeight: 650, letterSpacing: "-0.01em", color: "var(--text-1)" }}>Mes cours</h2>
             <span className="badge badge-cyan">{courses.length} {courses.length === 1 ? "course" : "courses"}</span>
           </div>
 
@@ -247,7 +247,7 @@ const TeacherDashboard = () => {
             <div className="empty-state">
               <BookOpen className="h-8 w-8" style={{ color: "var(--text-3)" }} />
               <div>
-                <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>No courses yet</p>
+                <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Aucun cours pour l'instant</p>
                 <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>Contact your administrator to get courses assigned.</p>
               </div>
             </div>

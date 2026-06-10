@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import axiosClient from "../../api/axiosClient";
 import DashboardLayout from "../../components/layout/DashboardLayout";
+import AnalyticsCharts from "../../components/AnalyticsCharts";
 import { useAuth } from "../../context/AuthContext";
 import {
   Users, GraduationCap, BookOpen, Building2,
@@ -97,8 +98,7 @@ const UserBreakdown = ({ admins = 0, teachers = 0, students = 0 }) => {
             <span className="text-sm font-normal" style={{ color: "var(--text-3)" }}>total users</span>
           </p>
         </div>
-        <Link to="/admin/users" className="btn-ghost px-3 py-1.5 text-xs">
-          Manage <ArrowUpRight className="h-3 w-3" />
+        <Link to="/admin/users" className="btn-ghost px-3 py-1.5 text-xs">Gérer<ArrowUpRight className="h-3 w-3" />
         </Link>
       </div>
 
@@ -268,11 +268,11 @@ const AdminDashboard = () => {
                 WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
               }}>{firstName}</span>
             </h1>
-            <p className="page-sub mt-2">Full platform overview · {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</p>
+            <p className="page-sub mt-2">Aperçu complet de la plateforme · {new Date().toLocaleDateString("fr-FR", { weekday: "long", month: "long", day: "numeric" })}</p>
           </div>
           <Link to="/admin/users">
             <button className="btn-primary gap-1.5 px-5 py-2.5">
-              <Plus className="h-4 w-4" /> New User
+              <Plus className="h-4 w-4" /> Nouvel utilisateur
             </button>
           </Link>
         </div>
@@ -371,6 +371,9 @@ const AdminDashboard = () => {
             ))}
           </div>
         </div>
+
+        {/* ── Attendance analytics ─────────────────────────────────────── */}
+        <AnalyticsCharts />
 
       </div>
     </DashboardLayout>

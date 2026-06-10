@@ -15,7 +15,7 @@ const getFileName  = (p) => p ? p.split("/").pop() : "Unnamed";
 const getExt       = (p) => { if (!p) return ""; const pts = p.split("."); return pts.length > 1 ? pts.pop().toUpperCase() : ""; };
 const getIcon      = (p) => { const e = getExt(p).toLowerCase(); if (["jpg","jpeg","png","gif","webp","svg"].includes(e)) return FileImage; if (["pdf","doc","docx","txt","md","ppt","pptx"].includes(e)) return FileText; return FileIcon; };
 const getUrl       = (p) => p ? (p.startsWith("http") ? p : `${BACKEND_ORIGIN}${p}`) : "#";
-const fmtDate      = (d) => d ? new Date(d).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : "";
+const fmtDate      = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { year: "numeric", month: "short", day: "numeric" }) : "";
 const fmtSize      = (b) => { if (!b) return ""; if (b < 1024) return `${b} B`; if (b < 1048576) return `${(b/1024).toFixed(1)} KB`; return `${(b/1048576).toFixed(1)} MB`; };
 
 const TeacherMaterialsPage = () => {
@@ -86,7 +86,7 @@ const TeacherMaterialsPage = () => {
             <div>
               <p className="label">Course Materials</p>
               <h1 className="page-title mt-1">{course?.title ?? "Loading…"}</h1>
-              <p className="page-sub">Upload and manage learning resources for this course.</p>
+              <p className="page-sub">Téléversez et gérez les ressources pédagogiques de ce cours.</p>
             </div>
             <div className="stat-card px-5 py-3 text-right hidden md:block">
               <p className="stat-label">Total files</p>
@@ -154,7 +154,7 @@ const TeacherMaterialsPage = () => {
             <div className="empty-state">
               <FileText className="h-8 w-8" style={{ color: "var(--text-3)" }} />
               <div>
-                <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>No materials yet</p>
+                <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Aucun support pour l'instant</p>
                 <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>Upload your first file above.</p>
               </div>
             </div>
@@ -216,7 +216,7 @@ const TeacherMaterialsPage = () => {
                 </div>
               </div>
               <div className="mt-5 flex justify-end gap-2">
-                <button onClick={() => setDelTarget(null)} disabled={deleting} className="btn-ghost px-4 py-2 text-sm">Cancel</button>
+                <button onClick={() => setDelTarget(null)} disabled={deleting} className="btn-ghost px-4 py-2 text-sm">Annuler</button>
                 <button onClick={confirmDelete} disabled={deleting} className="btn-danger gap-1.5 px-4 py-2 text-sm">
                   {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                   {deleting ? "Deleting…" : "Delete"}

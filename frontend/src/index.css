@@ -8,44 +8,44 @@
    DESIGN TOKENS — Aurora Glass System
    ═══════════════════════════════════════════════════════════════ */
 :root {
-  /* Base */
-  --bg:   #030312;
-  --bg-2: #05051a;
+  /* Base — calm navy (institutional, less "neon toy") */
+  --bg:   #050814;
+  --bg-2: #080d1b;
 
-  /* Glass surfaces — semi-transparent so aurora shows through */
-  --surface:   rgba(6, 6, 22, 0.72);
-  --surface-2: rgba(8, 8, 28, 0.78);
-  --surface-3: rgba(10, 10, 34, 0.82);
-  --surface-4: rgba(14, 14, 40, 0.88);
-  --surface-solid: #0a0a1e;
+  /* Glass surfaces */
+  --surface:   rgba(12, 18, 32, 0.82);
+  --surface-2: rgba(16, 24, 40, 0.90);
+  --surface-3: rgba(22, 31, 49, 0.92);
+  --surface-4: rgba(28, 38, 58, 0.94);
+  --surface-solid: #111827;
 
-  /* Borders */
-  --border:       rgba(255, 255, 255, 0.07);
-  --border-hover: rgba(255, 255, 255, 0.15);
-  --border-glow:  rgba(139, 92, 246, 0.5);
+  /* Borders — cool, soft */
+  --border:       rgba(196, 205, 224, 0.11);
+  --border-hover: rgba(196, 205, 224, 0.20);
+  --border-glow:  rgba(109, 93, 252, 0.45);
 
-  /* Text */
-  --text-1: #f0f0ff;
-  --text-2: #7878a0;
-  --text-3: #38384e;
+  /* Text — higher legibility */
+  --text-1: #f5f7fb;
+  --text-2: #a7b0c2;
+  --text-3: #667085;
 
-  /* Accents */
-  --violet: #7c3aed;
-  --cyan:   #0891b2;
-  --pink:   #be185d;
-  --amber:  #b45309;
-  --green:  #15803d;
-  --red:    #b91c1c;
-  --blue:   #1d4ed8;
+  /* Accents — slightly desaturated for a calmer, premium feel */
+  --violet: #6d5dfc;
+  --cyan:   #12a8b7;
+  --pink:   #d94f86;
+  --amber:  #d69a2d;
+  --green:  #32b56b;
+  --red:    #e05252;
+  --blue:   #4479ff;
 
   /* Foregrounds */
-  --violet-fg: #a78bfa;
-  --cyan-fg:   #22d3ee;
-  --pink-fg:   #f472b6;
-  --amber-fg:  #fbbf24;
-  --green-fg:  #4ade80;
-  --red-fg:    #f87171;
-  --blue-fg:   #60a5fa;
+  --violet-fg: #b4a8ff;
+  --cyan-fg:   #67dfe8;
+  --pink-fg:   #ff91bd;
+  --amber-fg:  #f6c45c;
+  --green-fg:  #75dc9a;
+  --red-fg:    #ff8b8b;
+  --blue-fg:   #8fb1ff;
 
   /* Glows — used for orbs and shadows */
   --glow-violet: rgba(124, 58, 237, 0.28);
@@ -715,49 +715,12 @@ select option { background: #0a0a1e; color: var(--text-1); }
 }
 .neon-ring:hover::after { opacity: 1; }
 
-/* Refinement pass: calmer product UI, stronger hierarchy, less neon noise. */
+/* ───────────────────────────────────────────────────────────────
+   TYPOGRAPHY TRACKING
+   The token system above (single :root) is the source of truth. Headings and
+   controls render with neutral tracking for a clean, product-grade feel.
+   ─────────────────────────────────────────────────────────────── */
 @layer base {
-  :root {
-    --bg: #050814;
-    --bg-2: #080d1b;
-    --surface: rgba(12, 18, 32, 0.82);
-    --surface-2: rgba(16, 24, 40, 0.9);
-    --surface-3: rgba(22, 31, 49, 0.92);
-    --surface-4: rgba(28, 38, 58, 0.94);
-    --surface-solid: #111827;
-    --border: rgba(196, 205, 224, 0.11);
-    --border-hover: rgba(196, 205, 224, 0.2);
-    --text-1: #f5f7fb;
-    --text-2: #a7b0c2;
-    --text-3: #667085;
-    --violet: #6d5dfc;
-    --cyan: #12a8b7;
-    --pink: #d94f86;
-    --amber: #d69a2d;
-    --green: #32b56b;
-    --red: #e05252;
-    --blue: #4479ff;
-    --violet-fg: #b4a8ff;
-    --cyan-fg: #67dfe8;
-    --pink-fg: #ff91bd;
-    --amber-fg: #f6c45c;
-    --green-fg: #75dc9a;
-    --red-fg: #ff8b8b;
-    --blue-fg: #8fb1ff;
-    --radius-sm: 6px;
-    --radius: 8px;
-    --radius-lg: 8px;
-    --radius-xl: 10px;
-  }
-
-  body {
-    background:
-      linear-gradient(135deg, rgba(18, 168, 183, 0.11), transparent 32%),
-      linear-gradient(215deg, rgba(217, 79, 134, 0.08), transparent 34%),
-      linear-gradient(180deg, #070b16 0%, #040712 100%);
-    letter-spacing: 0;
-  }
-
   h1, h2, h3, h4, h5, h6, p, span, button, input, textarea, select, a {
     letter-spacing: 0 !important;
   }

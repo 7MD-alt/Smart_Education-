@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import DashboardLayout from "../../components/layout/DashboardLayout";
+import { safeHtml } from "../../lib/sanitize";
 import axiosClient from "../../api/axiosClient";
 import { useAuth } from "../../context/AuthContext";
 import {
@@ -39,7 +40,7 @@ const MODE_BADGE = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const formatDate = (iso) => {
   if (!iso) return "";
-  return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  return new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
 };
 const formatDuration = (s) => {
   if (!s || s < 60) return `${s || 0}s`;
@@ -64,17 +65,17 @@ const TextContent = ({ text }) => {
           .replace(/`(.+?)`/g, '<code class="rounded bg-white/10 px-1 py-0.5 text-xs font-mono">$1</code>');
         if (isHeading) {
           const clean = formatted.replace(/^#+\s/, "");
-          return <p key={i} className="mt-3 font-semibold text-white/90" dangerouslySetInnerHTML={{ __html: clean }} />;
+          return <p key={i} className="mt-3 font-semibold text-white/90" dangerouslySetInnerHTML={{ __html: safeHtml(clean) }} />;
         }
         if (isBullet) {
           return (
             <div key={i} className="flex gap-2">
               <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-white/30" />
-              <p className="text-white/80" dangerouslySetInnerHTML={{ __html: formatted.replace(/^[-*•]\s/, "") }} />
+              <p className="text-white/80" dangerouslySetInnerHTML={{ __html: safeHtml(formatted.replace(/^[-*•]\s/, "")) }} />
             </div>
           );
         }
-        return <p key={i} className="text-white/80" dangerouslySetInnerHTML={{ __html: formatted }} />;
+        return <p key={i} className="text-white/80" dangerouslySetInnerHTML={{ __html: safeHtml(formatted) }} />;
       })}
     </div>
   );
@@ -571,7 +572,7 @@ const StudentChatPage = () => {
                 </div>
                 <button onClick={createSession}
                   className="inline-flex items-center gap-2 rounded-xl border border-violet-500/30 bg-violet-500/10 px-5 py-2.5 text-sm font-medium text-violet-300 hover:bg-violet-500/20 transition">
-                  <Plus className="h-4 w-4" /> Start New Session
+                  <Plus className="h-4 w-4" /> Start Nouvelle séance
                 </button>
               </div>
             )}

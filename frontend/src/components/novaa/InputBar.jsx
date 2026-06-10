@@ -94,6 +94,8 @@ const InputBar = ({
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={fileUploading || aiLoading}
+          aria-label="Joindre un fichier"
+          title="Joindre un fichier"
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded transition-all disabled:opacity-30"
           style={{
             border:      `1px solid ${attachedFile ? C : "rgba(0,210,255,.2)"}`,
@@ -136,6 +138,8 @@ const InputBar = ({
             <button
               onClick={onToggleListening}
               disabled={aiLoading}
+              aria-label={isListening ? "Arrêter l'enregistrement vocal" : "Saisie vocale"}
+              aria-pressed={isListening}
               title={isListening ? "Stop recording" : `Speak your question (${speechLang})`}
               className={`flex h-8 w-8 shrink-0 items-center justify-center rounded transition-all disabled:opacity-30 ${isListening ? "nv-mic-listening" : ""}`}
               style={{
@@ -180,6 +184,8 @@ const InputBar = ({
         <button
           onClick={onSend}
           disabled={!input.trim() || aiLoading}
+          aria-label="Envoyer le message"
+          title="Envoyer"
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded transition-all disabled:opacity-30"
           style={{ border: `1px solid ${C}`, background: `${C}18`, color: C, boxShadow: `0 0 8px ${C}33` }}
           onMouseEnter={e => { e.currentTarget.style.background = `${C}30`; e.currentTarget.style.boxShadow = `0 0 15px ${C}55`; }}

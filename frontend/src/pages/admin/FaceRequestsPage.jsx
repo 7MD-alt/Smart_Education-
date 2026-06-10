@@ -55,7 +55,7 @@ const RejectModal = ({ open, onClose, onConfirm, loading }) => {
           className="mt-4 w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-white placeholder:text-white/25 focus:border-white/25 focus:outline-none resize-none"
         />
         <div className="mt-4 flex gap-2">
-          <button onClick={onClose} className="flex-1 rounded-lg border border-white/10 px-4 py-2 text-sm text-white/60 hover:bg-white/[0.05] transition">Cancel</button>
+          <button onClick={onClose} className="flex-1 rounded-lg border border-white/10 px-4 py-2 text-sm text-white/60 hover:bg-white/[0.05] transition">Annuler</button>
           <button onClick={() => onConfirm(reason)} disabled={loading}
                   className="flex-1 rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white hover:bg-red-400 disabled:opacity-50 transition">
             {loading ? "Rejecting..." : "Reject"}
@@ -151,8 +151,8 @@ const FaceRequestsPage = () => {
         <div className="page-header">
           <div>
             <p className="label">Admin / Users</p>
-            <h1 className="page-title mt-1">Face Registration Requests</h1>
-            <p className="page-sub">Review student face photos before they're added to the recognition system.</p>
+            <h1 className="page-title mt-1">Demandes de reconnaissance faciale</h1>
+            <p className="page-sub">Vérifiez les photos des étudiants avant leur ajout au système de reconnaissance.</p>
           </div>
           <button onClick={fetchRequests} className="btn-ghost gap-1.5 flex items-center">
             <RefreshCcw className="h-4 w-4" /> Refresh
@@ -231,7 +231,7 @@ const FaceRequestsPage = () => {
                         </span>
                         <span className="flex items-center gap-1 text-xs text-white/40">
                           <Calendar className="h-3 w-3" />
-                          {new Date(req.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                          {new Date(req.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                         </span>
                       </div>
                       {req.status === "REJECTED" && req.reject_reason && (

@@ -35,3 +35,20 @@ Thumbs.db
 # ── IDE ────────────────────────────────────────────────────────────────────────
 .vscode/
 .idea/
+
+# ── Test / coverage artifacts ─────────────────────────────────────────────────
+.coverage
+htmlcov/
+.pytest_cache/
+
+# ── Local Claude / agent config ───────────────────────────────────────────────
+.claude/
+
+# ── MS Office temp lock files ─────────────────────────────────────────────────
+~$*
+
+# ── Local scratch / build helpers ─────────────────────────────────────────────
+_genfront.py
+_toc_sample/
+_v3_unpacked/
+prompt_figures_novaa.txt

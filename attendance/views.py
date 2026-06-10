@@ -12,6 +12,7 @@ import json
 import logging
 import requests as http_requests
 from django.http import HttpResponse, StreamingHttpResponse
+from django.db import transaction
 from django.core.mail import send_mail
 from django.utils import timezone
 from django.conf import settings as django_settings
@@ -63,6 +64,18 @@ from .models import (
     generate_seance_code,
 )
 from datetime import date, datetime, timedelta
+
+
+def _local_now():
+    """
+    Current wall-clock time in the configured TIME_ZONE, as a NAIVE datetime.
+    Séance dates/times are stored naive (DateField + TimeField) representing local
+    wall-clock, so we compare against this. Using timezone.localtime (instead of
+    datetime.now()) keeps check-in windows correct even when the server runs in
+    UTC (e.g. Render).
+    """
+    return timezone.localtime(timezone.now()).replace(tzinfo=None)
+
 
 from .serializers import (
     UserSerializer,
@@ -442,6 +455,7 @@ class ChatMessageViewSet(viewsets.ModelViewSet):
 
 class AttendanceScanAPIView(APIView):
     permission_classes = [IsAuthenticated, IsTeacherUserRole]
+    throttle_scope = "scan"
 
     def post(self, request):
         image = request.FILES.get("image")
@@ -510,6 +524,7 @@ class AttendanceScanAPIView(APIView):
 
 class ChatAskAPIView(APIView):
     permission_classes = [IsAuthenticated, IsStudentUserRole]
+    throttle_scope = "ai"
 
     def post(self, request):
         question  = request.data.get("question")
@@ -652,6 +667,95 @@ class AdminStatsAPIView(APIView):
             "materials": CourseMaterial.objects.count(),
         }
         return Response(data)
+
+
+class AdminAnalyticsAPIView(APIView):
+    """
+    GET /api/admin/analytics/?weeks=8
+    Platform-wide attendance insight for the analytics dashboard:
+      - trend:               weekly present/absent/late counts (last N weeks)
+      - status_distribution: overall present/absent/late totals
+      - by_filiere:          attendance rate per filière (sorted worst-first)
+      - danger:              students at/over the absence limit
+    All computed with aggregate queries (no per-row loops).
+    """
+    permission_classes = [IsAuthenticated, IsAdminUserRole]
+
+    def get(self, request):
+        from django.db.models import Count, Q
+        from django.db.models.functions import TruncWeek
+
+        try:
+            weeks = max(1, min(26, int(request.query_params.get("weeks", 8))))
+        except (TypeError, ValueError):
+            weeks = 8
+
+        today  = _local_now().date()
+        start  = today - timedelta(weeks=weeks)
+        recs   = AttendanceRecord.objects.filter(date__gte=start)
+
+        # ── Weekly trend ──────────────────────────────────────────────────────
+        weekly = (
+            recs.annotate(week=TruncWeek("date"))
+                .values("week")
+                .annotate(
+                    present=Count("id", filter=Q(status="PRESENT")),
+                    absent =Count("id", filter=Q(status="ABSENT")),
+                    late   =Count("id", filter=Q(status="LATE")),
+                )
+                .order_by("week")
+        )
+        trend = [
+            {
+                "week":    w["week"].strftime("%d/%m") if w["week"] else "",
+                "present": w["present"], "absent": w["absent"], "late": w["late"],
+            }
+            for w in weekly
+        ]
+
+        # ── Overall status distribution ───────────────────────────────────────
+        all_recs = AttendanceRecord.objects.all()
+        dist = all_recs.aggregate(
+            present=Count("id", filter=Q(status="PRESENT")),
+            absent =Count("id", filter=Q(status="ABSENT")),
+            late   =Count("id", filter=Q(status="LATE")),
+        )
+
+        # ── Per-filière attendance rate ───────────────────────────────────────
+        # absences per (student, course) → danger; rates aggregated per filière.
+        course_max = dict(Course.objects.values_list("id", "max_absences"))
+        by_filiere = []
+        danger_students = set()
+        for fil in Filiere.objects.all():
+            course_ids = list(
+                FiliereCourse.objects.filter(filiere=fil).values_list("course_id", flat=True)
+            )
+            if not course_ids:
+                continue
+            agg = AttendanceRecord.objects.filter(course_id__in=course_ids).aggregate(
+                present=Count("id", filter=Q(status="PRESENT")),
+                total  =Count("id"),
+            )
+            total = agg["total"] or 0
+            rate  = round((agg["present"] / total) * 100, 1) if total else 0.0
+            by_filiere.append({"filiere": fil.code, "name": fil.name, "rate": rate, "records": total})
+
+        # Danger students (aggregate over all absence records)
+        for row in (AttendanceRecord.objects.filter(status="ABSENT")
+                    .values("student_id", "course_id").annotate(n=Count("id"))):
+            if row["n"] >= course_max.get(row["course_id"], 10 ** 9):
+                danger_students.add(row["student_id"])
+
+        by_filiere.sort(key=lambda x: x["rate"])  # worst first
+
+        return Response({
+            "weeks":               weeks,
+            "trend":               trend,
+            "status_distribution": dist,
+            "by_filiere":          by_filiere,
+            "danger_count":        len(danger_students),
+            "total_records":       all_recs.count(),
+        })
 
 
 class AdminStudentDetailAPIView(APIView):
@@ -1654,6 +1758,7 @@ class ManualAttendanceSaveAPIView(APIView):
     """
     permission_classes = [IsAuthenticated, IsAdminOrTeacher]
 
+    @transaction.atomic
     def post(self, request, course_id):
         try:
             course = Course.objects.select_related("teacher").get(pk=course_id)
@@ -2217,7 +2322,7 @@ def _auto_activate_scheduled_seance(seance):
     """If a SCHEDULED seance is within 5 minutes of its start time, activate it."""
     if seance.status != SeanceStatus.SCHEDULED:
         return False
-    now = datetime.now()
+    now = _local_now()
     seance_start = datetime.combine(seance.date, seance.start_time)
     if now >= seance_start - timedelta(minutes=5):
         seance.status = SeanceStatus.ACTIVE
@@ -2234,7 +2339,7 @@ def _auto_complete_expired_seance(seance):
     """
     if seance.status != SeanceStatus.ACTIVE:
         return False
-    now = datetime.now()
+    now = _local_now()
     seance_end = datetime.combine(seance.date, seance.start_time) + timedelta(minutes=seance.duration_minutes)
     if now < seance_end:
         return False
@@ -2290,6 +2395,7 @@ class SeanceListCreateAPIView(APIView):
 
         return Response([_seance_to_dict(s, include_stats=True, include_code=True) for s in seances])
 
+    @transaction.atomic
     def post(self, request, course_id):
         course, err = self._get_course(request, course_id)
         if err:
@@ -2356,7 +2462,7 @@ class SeanceListCreateAPIView(APIView):
             created_seances.append(s)
 
         # Auto-activate seances scheduled to start within the next 5 minutes
-        now = datetime.now()
+        now = _local_now()
         for s in created_seances:
             seance_start = datetime.combine(s.date, s.start_time)
             if now >= seance_start - timedelta(minutes=5):
@@ -2496,6 +2602,7 @@ class SeanceEndAPIView(APIView):
     """
     permission_classes = [IsAuthenticated, IsTeacherUserRole]
 
+    @transaction.atomic
     def post(self, request, seance_id):
         try:
             seance = Seance.objects.select_related("course__teacher", "course").get(pk=seance_id)
@@ -2541,6 +2648,7 @@ class SeanceManualAttendanceAPIView(APIView):
     """
     permission_classes = [IsAuthenticated, IsTeacherUserRole]
 
+    @transaction.atomic
     def post(self, request, seance_id):
         try:
             seance = Seance.objects.select_related("course__teacher", "course").get(pk=seance_id)
@@ -2593,6 +2701,7 @@ class SeanceFaceScanAPIView(APIView):
     for the given séance, and returns the updated roster.
     """
     permission_classes = [IsAuthenticated, IsTeacherUserRole]
+    throttle_scope = "scan"
 
     def post(self, request, seance_id):
         try:
@@ -2712,7 +2821,7 @@ class StudentSeanceListAPIView(APIView):
 
             # Compute whether check-in is currently allowed
             # Window: 5 min before start → end of séance
-            now = datetime.now()
+            now = _local_now()
             seance_start = datetime.combine(s.date, s.start_time)
             seance_end   = seance_start + timedelta(minutes=s.duration_minutes)
             window_open  = seance_start - timedelta(minutes=5)
@@ -2768,6 +2877,7 @@ class StudentCheckInAPIView(APIView):
     On success → AttendanceRecord with PRESENT (or LATE if > 15 min past start).
     """
     permission_classes = [IsAuthenticated, IsStudentUserRole]
+    throttle_scope = "scan"
 
     def post(self, request, seance_id):
         import face_recognition as fr
@@ -2784,7 +2894,7 @@ class StudentCheckInAPIView(APIView):
             return Response({"error": "Student profile not found."}, status=status.HTTP_404_NOT_FOUND)
 
         # Time window check
-        now          = datetime.now()
+        now          = _local_now()
         seance_start = datetime.combine(seance.date, seance.start_time)
         seance_end   = seance_start + timedelta(minutes=seance.duration_minutes)
         window_open  = seance_start - timedelta(minutes=5)
@@ -2916,6 +3026,7 @@ class NovaaAskAPIView(APIView):
       student_id    str  optional (TEACHER only: for email draft context)
     """
     permission_classes = [IsAuthenticated]
+    throttle_scope = "ai"
 
     def post(self, request):
         question = (request.data.get("question") or "").strip()
@@ -2987,6 +3098,7 @@ class NovaaAskStreamAPIView(APIView):
     The client appends tokens live, then finalises on `done`.
     """
     permission_classes = [IsAuthenticated]
+    throttle_scope = "ai"
 
     def post(self, request):
         question = (request.data.get("question") or "").strip()
@@ -3065,28 +3177,19 @@ class HudStatsAPIView(APIView):
         # Active seances (started but not yet ended)
         active_sessions = Seance.objects.filter(status="ACTIVE").count()
 
-        # Danger zone: students whose absence count >= course max_absences
-        danger_zone_count = 0
-        for sp in StudentProfile.objects.select_related("user", "filiere").prefetch_related(
-            "filiere__filiere_courses__course"
-        ):
-            if sp.filiere is None:
-                continue
-            student = sp.user
-            in_danger = False
-            for fc in sp.filiere.filiere_courses.select_related("course").all():
-                try:
-                    course = fc.course
-                    absences = AttendanceRecord.objects.filter(
-                        student=student, course=course, status="ABSENT"
-                    ).count()
-                    if absences >= course.max_absences:
-                        in_danger = True
-                        break
-                except Exception:
-                    continue
-            if in_danger:
-                danger_zone_count += 1
+        # Danger zone: students whose ABSENT count >= the course's max_absences.
+        # Done with two aggregate queries instead of a per-student/per-course loop.
+        from django.db.models import Count
+        course_max = dict(Course.objects.values_list("id", "max_absences"))
+        danger_students = {
+            row["student_id"]
+            for row in AttendanceRecord.objects
+                .filter(status="ABSENT")
+                .values("student_id", "course_id")
+                .annotate(n=Count("id"))
+            if row["n"] >= course_max.get(row["course_id"], 10 ** 9)
+        }
+        danger_zone_count = len(danger_students)
 
         # 30-day attendance rate
         from django.utils.timezone import now as _now
@@ -3120,6 +3223,7 @@ class NovaaGeneratePDFView(APIView):
     Returns a PDF file as an attachment.
     """
     permission_classes = [IsAuthenticated]
+    throttle_scope = "ai"
 
     def post(self, request):
         content      = (request.data.get("content")      or "").strip()

@@ -7,43 +7,43 @@ import axiosClient from "../../api/axiosClient";
 /* ── Route label map ─────────────────────────────────────────── */
 const ROUTE_LABELS = {
   /* Admin */
-  "/admin":             "Dashboard",
-  "/admin/users":       "Users",
-  "/admin/departments": "Departments",
-  "/admin/filieres":    "Filieres",
-  "/admin/courses":     "Courses",
-  "/admin/face-requests": "Face Requests",
-  "/admin/profile":     "Profile",
+  "/admin":             "Tableau de bord",
+  "/admin/users":       "Utilisateurs",
+  "/admin/departments": "Départements",
+  "/admin/filieres":    "Filières",
+  "/admin/courses":     "Cours",
+  "/admin/face-requests": "Demandes Face ID",
+  "/admin/profile":     "Profil",
   /* Teacher */
-  "/teacher":           "Dashboard",
-  "/teacher/courses":   "My Courses",
-  "/teacher/scan":      "Live Scan",
-  "/teacher/profile":   "Profile",
+  "/teacher":           "Tableau de bord",
+  "/teacher/courses":   "Mes cours",
+  "/teacher/scan":      "Scan en direct",
+  "/teacher/profile":   "Profil",
   /* Student */
-  "/student":           "Dashboard",
-  "/student/attendance":"Attendance",
-  "/student/seances":   "My Séances",
+  "/student":           "Tableau de bord",
+  "/student/attendance":"Présence",
+  "/student/seances":   "Mes séances",
   "/student/novaa":     "NOVAA",
-  "/student/chat":      "AI Tutor",
-  "/student/profile":   "Profile",
+  "/student/chat":      "Tuteur IA",
+  "/student/profile":   "Profil",
 };
 
 function getPageLabel(pathname) {
   if (ROUTE_LABELS[pathname]) return ROUTE_LABELS[pathname];
   /* Dynamic segments — order matters: most specific first */
-  if (pathname.includes("/roster"))      return "Attendance Roster";
-  if (pathname.includes("/danger-zone")) return "Danger Zone";
-  if (pathname.includes("/materials"))   return "Course Materials";
-  if (pathname.includes("/attendance"))  return "Attendance";
+  if (pathname.includes("/roster"))      return "Liste de présence";
+  if (pathname.includes("/danger-zone")) return "Zone de danger";
+  if (pathname.includes("/materials"))   return "Supports de cours";
+  if (pathname.includes("/attendance"))  return "Présence";
   if (pathname.includes("/seances"))     return "Séances";
-  if (pathname.includes("/chat"))        return "AI Tutor";
+  if (pathname.includes("/chat"))        return "Tuteur IA";
   return "CampusEye";
 }
 
 const ROLE_CONFIG = {
-  ADMIN:   { label: "Admin",   accent: "#f472b6", bg: "rgba(190,24,93,0.15)",  border: "rgba(190,24,93,0.3)"  },
-  TEACHER: { label: "Teacher", accent: "#22d3ee", bg: "rgba(8,145,178,0.15)", border: "rgba(8,145,178,0.3)"  },
-  STUDENT: { label: "Student", accent: "#a78bfa", bg: "rgba(124,58,237,0.15)",border: "rgba(124,58,237,0.3)" },
+  ADMIN:   { label: "Admin",      accent: "#f472b6", bg: "rgba(190,24,93,0.15)",  border: "rgba(190,24,93,0.3)"  },
+  TEACHER: { label: "Enseignant", accent: "#22d3ee", bg: "rgba(8,145,178,0.15)", border: "rgba(8,145,178,0.3)"  },
+  STUDENT: { label: "Étudiant",   accent: "#a78bfa", bg: "rgba(124,58,237,0.15)",border: "rgba(124,58,237,0.3)" },
 };
 
 /* ── Notification type styling ───────────────────────────────── */
@@ -58,10 +58,10 @@ const NOTIF_STYLE = {
 
 function fmtRelative(iso) {
   const diff = (Date.now() - new Date(iso)) / 1000;
-  if (diff < 60)   return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400)return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
+  if (diff < 60)   return "à l'instant";
+  if (diff < 3600) return `il y a ${Math.floor(diff / 60)} min`;
+  if (diff < 86400)return `il y a ${Math.floor(diff / 3600)} h`;
+  return `il y a ${Math.floor(diff / 86400)} j`;
 }
 
 /* ── NotificationBell ────────────────────────────────────────── */
@@ -176,7 +176,7 @@ const NotificationBell = () => {
               {unreadCount > 0 && (
                 <span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold"
                       style={{ background: "rgba(124,58,237,0.2)", color: "#a78bfa" }}>
-                  {unreadCount} new
+                  {unreadCount} {unreadCount > 1 ? "nouveaux" : "nouveau"}
                 </span>
               )}
             </div>
@@ -184,13 +184,13 @@ const NotificationBell = () => {
               {unreadCount > 0 && (
                 <button
                   onClick={markAll}
-                  title="Mark all as read"
+                  title="Tout marquer comme lu"
                   className="flex items-center gap-1 rounded px-2 py-1 text-[11px] transition-all"
                   style={{ color: "var(--text-3)" }}
                   onMouseEnter={e => e.currentTarget.style.color = "#a78bfa"}
                   onMouseLeave={e => e.currentTarget.style.color = "var(--text-3)"}
                 >
-                  <CheckCheck className="h-3.5 w-3.5" /> All read
+                  <CheckCheck className="h-3.5 w-3.5" /> Tout lu
                 </button>
               )}
               <button
@@ -215,7 +215,7 @@ const NotificationBell = () => {
             ) : notifications.length === 0 ? (
               <div className="flex flex-col items-center gap-2 py-10 text-center">
                 <Bell className="h-8 w-8 opacity-20" style={{ color: "var(--text-3)" }} />
-                <p className="text-xs" style={{ color: "var(--text-3)" }}>No notifications yet</p>
+                <p className="text-xs" style={{ color: "var(--text-3)" }}>Aucune notification</p>
               </div>
             ) : (
               notifications.map((notif) => {

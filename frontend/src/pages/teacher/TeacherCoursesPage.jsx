@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import axiosClient from "../../api/axiosClient";
+import { authedFetch } from "../../api/config";
 import { useToast } from "../../context/ToastContext";
 import DashboardLayout from "../../components/layout/DashboardLayout";
 import {
@@ -166,11 +167,7 @@ const TeacherCoursesPage = () => {
   const downloadReport = async (course) => {
     setDownloading(course.id);
     try {
-      const token = localStorage.getItem("access_token");
-      const res = await fetch(
-        `http://127.0.0.1:8000/api/teacher/courses/${course.id}/report/`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const res = await authedFetch(`teacher/courses/${course.id}/report/`);
       if (!res.ok) throw new Error();
       const blob = await res.blob();
       const url  = URL.createObjectURL(blob);
@@ -200,8 +197,8 @@ const TeacherCoursesPage = () => {
         <div className="page-header">
           <div>
             <p className="label">Teacher</p>
-            <h1 className="page-title mt-1">My Courses</h1>
-            <p className="page-sub">All courses assigned to you — manage attendance, materials, and reports.</p>
+            <h1 className="page-title mt-1">Mes cours</h1>
+            <p className="page-sub">Tous les cours qui vous sont assignés — gérez la présence, les supports et les rapports.</p>
           </div>
         </div>
 
@@ -214,7 +211,7 @@ const TeacherCoursesPage = () => {
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search courses or filières…"
+              placeholder="Rechercher cours ou filières…"
               className="w-full bg-transparent text-sm outline-none"
               style={{ color: "var(--text-1)" }}
             />

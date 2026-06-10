@@ -14,7 +14,7 @@ const BACKEND_ORIGIN = import.meta.env.VITE_API_URL?.replace("/api/", "") ?? "ht
 const getFileName = (p) => p ? decodeURIComponent(p.split("/").pop()) : "Unnamed";
 const getExt      = (p) => { if (!p) return ""; const pts = p.split("."); return pts.length > 1 ? pts.pop().toUpperCase() : "FILE"; };
 const getUrl      = (p) => p ? (p.startsWith("http") ? p : `${BACKEND_ORIGIN}${p}`) : "#";
-const fmtDate     = (d) => d ? new Date(d).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : "";
+const fmtDate     = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { year: "numeric", month: "short", day: "numeric" }) : "";
 const fmtSize     = (b) => { if (!b) return ""; if (b < 1024) return `${b} B`; if (b < 1048576) return `${(b / 1024).toFixed(1)} KB`; return `${(b / 1048576).toFixed(1)} MB`; };
 
 /* ── File type helpers ───────────────────────────────────────── */
@@ -212,7 +212,7 @@ const StudentCourseMaterialsPage = () => {
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search files by name…"
+              placeholder="Rechercher un fichier par nom…"
               className="w-full bg-transparent text-sm outline-none"
               style={{ color: "var(--text-1)" }}
             />
@@ -238,7 +238,7 @@ const StudentCourseMaterialsPage = () => {
               <Folder className="h-6 w-6" style={{ color: "#a78bfa" }} />
             </div>
             <div className="text-center">
-              <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>No materials yet</p>
+              <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Aucun support pour l'instant</p>
               <p className="mt-1 text-xs" style={{ color: "var(--text-3)" }}>
                 Your teacher hasn't uploaded any files for this course yet.
               </p>

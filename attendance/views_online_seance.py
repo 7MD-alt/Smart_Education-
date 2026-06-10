@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 
 import requests
 from django.conf import settings
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -119,7 +120,7 @@ class ScheduleOnlineSeanceAPIView(APIView):
                             status=status.HTTP_502_BAD_GATEWAY)
 
         # ── Persist an online séance so it shows in the séance list ───────────
-        now = datetime.now()
+        now = timezone.localtime(timezone.now()).replace(tzinfo=None)
         seance_start = datetime.combine(seance_date, start_time)
         initial_status = (
             SeanceStatus.ACTIVE if now >= seance_start - timedelta(minutes=5)

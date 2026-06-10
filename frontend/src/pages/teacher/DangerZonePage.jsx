@@ -30,7 +30,9 @@ const DangerZonePage = () => {
     setSending(true);
     try {
       // Trigger n8n webhook — n8n fetches danger zone students and emails them via Django
-      await fetch("http://localhost:5678/webhook/campuseye-danger-alerts", {
+      const n8nUrl = import.meta.env.VITE_N8N_DANGER_WEBHOOK
+        || "http://localhost:5678/webhook/campuseye-danger-alerts";
+      await fetch(n8nUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ course_id: courseId }),
@@ -62,7 +64,7 @@ const DangerZonePage = () => {
             <div>
               <p className="label flex items-center gap-1.5"><AlertTriangle className="h-3 w-3 text-red-400" /> Danger Zone</p>
               <h1 className="page-title mt-1">{data?.course_title ?? "Loading…"}</h1>
-              <p className="page-sub">Students approaching or exceeding the absence limit.</p>
+              <p className="page-sub">Étudiants proches ou au-delà de la limite d'absences.</p>
             </div>
             {data && !loading && (
               <button onClick={sendAlerts} disabled={sending || (dangerCt + warningCt === 0)}
@@ -116,8 +118,8 @@ const DangerZonePage = () => {
                   <CheckCircle2 className="h-5 w-5 text-green-400" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-green-400">All students are within limits</p>
-                  <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>No attendance issues found for this course.</p>
+                  <p className="text-sm font-semibold text-green-400">Tous les étudiants sont dans les limites</p>
+                  <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>Aucun problème de présence pour ce cours.</p>
                 </div>
               </div>
             ) : (

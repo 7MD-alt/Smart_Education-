@@ -161,13 +161,13 @@ const LoginPage = () => {
 
         <div className="w-full max-w-sm">
 
-          {/* Back to home — desktop only (shown here for right panel) */}
+          {/* Retour à l'accueil — desktop only (shown here for right panel) */}
           <div className="mb-6 hidden lg:flex items-center justify-between">
             <Link to="/" className="flex items-center gap-1.5 text-xs font-medium transition-all"
               style={{ color: "var(--text-3)" }}
               onMouseEnter={e => e.currentTarget.style.color = "var(--text-1)"}
               onMouseLeave={e => e.currentTarget.style.color = "var(--text-3)"}>
-              <ArrowLeft className="h-3 w-3" /> Back to home
+              <ArrowLeft className="h-3 w-3" /> Retour à l'accueil
             </Link>
           </div>
 
@@ -177,10 +177,10 @@ const LoginPage = () => {
               className="leading-none"
               style={{ fontSize: "1.85rem", fontWeight: 700, letterSpacing: "-0.04em", color: "#f0f0ff" }}
             >
-              Welcome back
+              Bon retour
             </h2>
             <p className="mt-2 text-sm" style={{ color: "var(--text-2)" }}>
-              Sign in to your CampusEye account
+              Connectez-vous à votre compte CampusEye
             </p>
           </div>
 
@@ -204,7 +204,7 @@ const LoginPage = () => {
                 <label className="label" htmlFor="username">Username</label>
                 <input
                   id="username" type="text" className="input"
-                  placeholder="Enter your username"
+                  placeholder="Entrez votre nom d'utilisateur"
                   value={username} onChange={e => setUsername(e.target.value)}
                   required autoComplete="username" autoFocus
                 />
@@ -216,7 +216,7 @@ const LoginPage = () => {
                   <input
                     id="password" type={showPwd ? "text" : "password"}
                     className="input pr-10"
-                    placeholder="Enter your password"
+                    placeholder="Entrez votre mot de passe"
                     value={password} onChange={e => setPassword(e.target.value)}
                     required autoComplete="current-password"
                   />

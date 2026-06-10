@@ -170,8 +170,8 @@ def record_facts(user_id, message: str) -> int:
         )
         if len(ids) > _MAX_FACTS_STORED:
             StudentMemory.objects.filter(pk__in=ids[_MAX_FACTS_STORED:]).delete()
-    except Exception:
-        pass
+    except Exception as _exc:
+        logger.debug("[suppressed] %s", _exc)
 
     if saved:
         logger.info("[NovaaMem] recorded %d fact(s) for student %s", saved, student.student_id)

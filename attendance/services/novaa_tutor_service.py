@@ -1014,8 +1014,8 @@ Rules:
         suggestions = json.loads(raw)
         if isinstance(suggestions, list):
             return [str(s).strip() for s in suggestions[:3] if s]
-    except Exception:
-        pass
+    except Exception as _exc:
+        logger.debug("[suppressed] %s", _exc)
     return []
 
 
@@ -2307,8 +2307,8 @@ def ask_novaa_stream(**kwargs):
             try:
                 from django.db import connection
                 connection.close()
-            except Exception:
-                pass
+            except Exception as _exc:
+                logger.debug("[suppressed] %s", _exc)
             q.put((_SENTINEL, None))
 
     worker = _threading.Thread(target=_worker, daemon=True)

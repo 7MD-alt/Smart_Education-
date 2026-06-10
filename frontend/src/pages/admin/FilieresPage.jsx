@@ -19,7 +19,7 @@ const Modal = ({ open, onClose, title, children, onSave, saving }) => {
         </div>
         <div className="modal-body">{children}</div>
         <div className="modal-footer">
-          <button onClick={onClose} className="btn-ghost px-4 py-2 text-sm">Cancel</button>
+          <button onClick={onClose} className="btn-ghost px-4 py-2 text-sm">Annuler</button>
           <button onClick={onSave} disabled={saving} className="btn-primary px-5 py-2 text-sm">
             {saving ? "Saving…" : "Save"}
           </button>
@@ -215,11 +215,11 @@ const FilieresPage = () => {
         <div className="page-header">
           <div>
             <p className="label">Admin / Filieres</p>
-            <h1 className="page-title mt-1">Filieres</h1>
-            <p className="page-sub">Academic programs organized under each department.</p>
+            <h1 className="page-title mt-1">Filières</h1>
+            <p className="page-sub">Programmes académiques organisés par département.</p>
           </div>
           <button onClick={openCreate} disabled={departments.length === 0} className="btn-primary gap-1.5 disabled:opacity-40">
-            <Plus className="h-4 w-4" /> New Filiere
+            <Plus className="h-4 w-4" /> Nouvelle filière
           </button>
         </div>
 
@@ -247,7 +247,7 @@ const FilieresPage = () => {
           <div className="flex flex-1 max-w-xs items-center gap-2 rounded-[var(--radius)] px-3 py-2"
                style={{ border: "1px solid var(--border)", background: "var(--surface)" }}>
             <Search className="h-4 w-4 shrink-0" style={{ color: "var(--text-3)" }} />
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search filieres…"
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher des filières…"
                    className="w-full bg-transparent text-sm outline-none" style={{ color: "var(--text-1)" }} />
           </div>
           <span className="text-sm" style={{ color: "var(--text-3)" }}>
@@ -262,7 +262,7 @@ const FilieresPage = () => {
           <div className="empty-state">
             <Layers className="h-8 w-8" style={{ color: "var(--text-3)" }} />
             <div>
-              <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>No filieres found</p>
+              <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Aucune filière trouvée</p>
               <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>{search || deptFilter !== "ALL" ? "Clear filters." : "Create your first filiere."}</p>
             </div>
           </div>
@@ -319,7 +319,7 @@ const FilieresPage = () => {
 
       {/* Create/Edit Modal */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)}
-             title={editing ? "Edit Filiere" : "New Filiere"} onSave={handleSave} saving={saving}>
+             title={editing ? "Edit Filiere" : "Nouvelle filière"} onSave={handleSave} saving={saving}>
         <div className="space-y-4">
           {formErr && <div className="rounded-[var(--radius)] px-3 py-2 text-sm text-red-400"
                           style={{ background: "rgba(185,28,28,0.08)", border: "1px solid rgba(185,28,28,0.2)" }}>{formErr}</div>}
@@ -352,7 +352,7 @@ const FilieresPage = () => {
               <h3 className="text-base font-semibold" style={{ color: "var(--text-1)" }}>Delete {delTarget.name}?</h3>
               <p className="mt-1.5 text-sm" style={{ color: "var(--text-2)" }}>All students in this filiere will be affected. This cannot be undone.</p>
               <div className="mt-5 flex gap-2">
-                <button onClick={() => setDelTarget(null)} className="btn-ghost flex-1 py-2 text-sm">Cancel</button>
+                <button onClick={() => setDelTarget(null)} className="btn-ghost flex-1 py-2 text-sm">Annuler</button>
                 <button onClick={handleDelete} disabled={deleting} className="btn-danger flex-1 py-2 text-sm">{deleting ? "Deleting…" : "Delete"}</button>
               </div>
             </div>

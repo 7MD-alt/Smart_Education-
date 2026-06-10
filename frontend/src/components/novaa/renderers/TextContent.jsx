@@ -1,4 +1,5 @@
 import { C } from "../constants";
+import { safeHtml } from "../../../lib/sanitize";
 
 /** Renders plain-text AI responses with inline markdown: bold, code, bullets, headings. */
 const TextContent = ({ text }) => {
@@ -20,7 +21,7 @@ const TextContent = ({ text }) => {
           const clean = fmt.replace(/^#+\s/, "");
           return (
             <p key={i} className="mt-3 font-semibold nv-mono" style={{ color: C }}
-               dangerouslySetInnerHTML={{ __html: clean }} />
+               dangerouslySetInnerHTML={{ __html: safeHtml(clean) }} />
           );
         }
         if (isBullet) return (
@@ -28,15 +29,15 @@ const TextContent = ({ text }) => {
             <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
                   style={{ background: C, boxShadow: `0 0 4px ${C}` }} />
             <p style={{ color: "#9acfe8" }}
-               dangerouslySetInnerHTML={{ __html: fmt.replace(/^[-*•]\s/, "") }} />
+               dangerouslySetInnerHTML={{ __html: safeHtml(fmt.replace(/^[-*•]\s/, "")) }} />
           </div>
         );
         if (isTable)
           return <p key={i} className="nv-mono text-xs" style={{ color: "#7ab8d4" }}
-                    dangerouslySetInnerHTML={{ __html: fmt }} />;
+                    dangerouslySetInnerHTML={{ __html: safeHtml(fmt) }} />;
 
         return <p key={i} style={{ color: "#9acfe8" }}
-                  dangerouslySetInnerHTML={{ __html: fmt }} />;
+                  dangerouslySetInnerHTML={{ __html: safeHtml(fmt) }} />;
       })}
     </div>
   );

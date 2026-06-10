@@ -301,7 +301,7 @@ const StudentDashboard = () => {
                     <CheckCircle className="h-5 w-5 text-green-400" style={{ filter: "drop-shadow(0 0 6px #4ade80)" }} />
                   </div>
                   <p className="text-sm font-semibold text-green-400">You're all good!</p>
-                  <p className="text-xs" style={{ color: "var(--text-3)" }}>No attendance issues found</p>
+                  <p className="text-xs" style={{ color: "var(--text-3)" }}>Aucun problème de présence</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -342,14 +342,14 @@ const StudentDashboard = () => {
         {/* Courses */}
         <div>
           <div className="mb-4 flex items-center justify-between">
-            <h2 style={{ fontSize: "0.8125rem", fontWeight: 650, letterSpacing: "-0.01em", color: "var(--text-1)" }}>My Courses</h2>
+            <h2 style={{ fontSize: "0.8125rem", fontWeight: 650, letterSpacing: "-0.01em", color: "var(--text-1)" }}>Mes cours</h2>
             <span className="badge badge-violet">{courses.length} {courses.length !== 1 ? "courses" : "course"}</span>
           </div>
 
           {!loading && courses.length === 0 && (
             <div className="empty-state">
               <BookOpen className="h-8 w-8" style={{ color: "var(--text-3)" }} />
-              <p className="text-sm" style={{ color: "var(--text-3)" }}>No courses found for this semester.</p>
+              <p className="text-sm" style={{ color: "var(--text-3)" }}>Aucun cours trouvé pour ce semestre.</p>
             </div>
           )}
 

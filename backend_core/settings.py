@@ -14,12 +14,25 @@ load_dotenv(os.path.join(Path(__file__).resolve().parent.parent, '.env'))
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "django-insecure-!w%sz*+(=)pwj_=n&()73axpyhceq40ui0xj+5=ohg*z4l0zxg")
-
 DEBUG = os.environ.get("DEBUG", "True") == "True"
+
+# SECRET_KEY must come from the environment. A dev-only fallback is allowed when
+# DEBUG=True; in production (DEBUG=False) a missing key is a hard error so we can
+# never accidentally ship with a known/guessable key (which would let anyone
+# forge JWTs).
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = "django-insecure-dev-only-do-not-use-in-production"
+    else:
+        raise RuntimeError(
+            "DJANGO_SECRET_KEY environment variable is required when DEBUG=False."
+        )
 
 # ── NOVAA HUD integration ──────────────────────────────────────────────────
 HUD_SECRET_TOKEN = os.environ.get("HUD_SECRET_TOKEN", "novaa-hud-2024")
+if not DEBUG and HUD_SECRET_TOKEN == "novaa-hud-2024":
+    raise RuntimeError("HUD_SECRET_TOKEN must be set to a strong value when DEBUG=False.")
 
 ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
@@ -113,15 +126,16 @@ if DATABASE_URL:
         )
     }
 else:
-    # Local development: use your local PostgreSQL
+    # Local development: credentials come from the (gitignored) .env file so no
+    # secret is committed to source. See .env / .env.example for the keys.
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
-            "NAME": "est_attendance_db",
-            "USER": "postgres",
-            "PASSWORD": "ahmed",
-            "HOST": "localhost",
-            "PORT": "5432",
+            "NAME":     os.environ.get("DB_NAME", "est_attendance_db"),
+            "USER":     os.environ.get("DB_USER", "postgres"),
+            "PASSWORD": os.environ.get("DB_PASSWORD", ""),
+            "HOST":     os.environ.get("DB_HOST", "localhost"),
+            "PORT":     os.environ.get("DB_PORT", "5432"),
         }
     }
 
@@ -151,7 +165,10 @@ AUTH_PASSWORD_VALIDATORS = [
 # ==========================================
 
 LANGUAGE_CODE = "en-us"
-TIME_ZONE = "UTC"
+# Wall-clock timezone for the platform. Séance times are entered as local time,
+# so anchoring to Morocco keeps check-in windows correct regardless of where the
+# server runs (e.g. Render runs in UTC).
+TIME_ZONE = "Africa/Casablanca"
 
 USE_I18N = True
 USE_TZ = True
@@ -216,6 +233,28 @@ else:
 
 
 # ==========================================
+# PRODUCTION SECURITY HARDENING
+# ==========================================
+# Only applied when DEBUG=False so local dev over http keeps working.
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 60 * 60 * 24 * 30          # 30 days
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = "same-origin"
+    X_FRAME_OPTIONS = "DENY"
+    # Honour the X-Forwarded-Proto header set by Render/Vercel/Nginx so Django
+    # knows the original request was HTTPS.
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    CSRF_TRUSTED_ORIGINS = [
+        o for o in [os.environ.get("FRONTEND_URL")] if o
+    ]
+
+
+# ==========================================
 # DJANGO REST FRAMEWORK
 # ==========================================
 
@@ -236,6 +275,20 @@ REST_FRAMEWORK = {
         "rest_framework.filters.SearchFilter",
         "rest_framework.filters.OrderingFilter",
     ],
+
+    # ── Rate limiting ──────────────────────────────────────────────────────────
+    # Protects against brute-force (login) and cost abuse (the AI/LLM endpoints).
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+        "rest_framework.throttling.ScopedRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "30/min",     # unauthenticated requests (e.g. login attempts)
+        "user": "300/min",    # general authenticated traffic
+        "ai":   "20/min",     # NOVAA / LLM endpoints — paid + expensive
+        "scan": "30/min",     # face-recognition check-in / scan
+    },
 }
 
 
@@ -266,6 +319,8 @@ CAMPUSEYE_FRONTEND_URL = os.environ.get("CAMPUSEYE_FRONTEND_URL", "http://localh
 # ── n8n integration ────────────────────────────────────────────────────────
 # Set this in your .env file — must match N8N_SECRET_TOKEN in docker-compose
 N8N_SECRET_TOKEN = os.environ.get("N8N_SECRET_TOKEN", "changeme-use-a-long-random-string")
+if not DEBUG and N8N_SECRET_TOKEN == "changeme-use-a-long-random-string":
+    raise RuntimeError("N8N_SECRET_TOKEN must be set to a strong value when DEBUG=False.")
 
 # Webhook URL of the "Online Séance Scheduler" n8n workflow (creates the Jitsi
 # meeting + emails students). Copy it from the workflow's Webhook node.

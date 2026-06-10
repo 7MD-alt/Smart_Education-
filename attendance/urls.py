@@ -9,6 +9,7 @@ from .n8n_views import (
 from .views_online_seance import ScheduleOnlineSeanceAPIView
 from .views import (
     AdminStatsAPIView,
+    AdminAnalyticsAPIView,
     AdminStudentDetailAPIView,
     AdminTeacherDetailAPIView,
     StudentStatsAPIView,
@@ -89,6 +90,7 @@ urlpatterns = [
     path("chat/upload/", ChatFileUploadAPIView.as_view(), name="chat-upload"),
     path("students/register-face/", StudentRegisterFaceAPIView.as_view(), name="student-register-face"),
     path("admin/stats/", AdminStatsAPIView.as_view(), name="admin-stats"),
+    path("admin/analytics/", AdminAnalyticsAPIView.as_view(), name="admin-analytics"),
     path("teacher/stats/", TeacherStatsAPIView.as_view(), name="teacher-stats"),
     path("student/stats/", StudentStatsAPIView.as_view(), name="student-stats"),
     path("teacher/attendance-summary/", TeacherAttendanceSummaryAPIView.as_view(), name="teacher-attendance-summary"),
